@@ -1,0 +1,9 @@
+%% Read bag
+bag = rosbag('/home/tommaso/bags/gps_imu_two_laps.bag');
+
+
+gpsTopic = select(bag,'Topic','/gps/position');
+
+gpsData = readMessages(bSel,'DataFormat','struct');
+
+latitude = 

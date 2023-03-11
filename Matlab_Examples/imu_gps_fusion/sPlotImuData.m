@@ -1,9 +1,7 @@
 close all
 clc
 format long     %% evita di troncare i decimali
-if isempty(out)
-    out = sim('/home/tommaso/Documents/Tesi/Matlab_Examples/Test_Bag_Reader/read_imu_data.slx');
-end
+load('bag_gps_imu.mat')
 
 imu_data_sz = length(imu_orientation.Orientation.X.Data);
 
