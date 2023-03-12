@@ -1,5 +1,5 @@
 close all
-clear all
+clear
 clc
 
 imuFs = 100;
@@ -123,14 +123,14 @@ end
 
 if usePoseView
     viewer = HelperPoseViewer( ...
-        'XPositionLimits', [-40, 40], ...
-        'YPositionLimits', [-40, 40], ...
-        'ZPositionLimits', [-10, 10], ...
+        'XPositionLimits', [-5, 25], ...
+        'YPositionLimits', [-15, 15], ...
+        'ZPositionLimits', [-2, 2], ...
         'ReferenceFrame', 'NED');
 end
 
 
-totalSimTime = 67; % seconds
+totalSimTime = round(bag.EndTime - bag.StartTime) - 1; % seconds
 
 % Log data for final metric computation.
 numsamples = floor(totalSimTime * gpsFs);
@@ -215,8 +215,8 @@ for sampleIdx = 1:numsamples
         alt_prev = altitude; %assuming no altitude deviation
         rv = measure_distance(latitude, longitude, altitude, lat_prev, lng_prev, alt_prev, (1 / gpsFs));
     else
-        % during 1st iteration speed = 0
-        rv = measure_distance(1, 0, 0, 0, 0, 0, (1 / gpsFs));
+        % during 1st set dummy speed to avoid error in pose correction
+        rv = [0.1, 0.1, 0]; %measure_distance(1, 0, 0, 0, 0, 0, (1 / gpsFs));
     end
     vx = rv(1);
     vy = rv(2);
