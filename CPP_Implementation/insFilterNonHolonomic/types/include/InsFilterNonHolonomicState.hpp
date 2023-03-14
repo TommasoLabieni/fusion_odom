@@ -4,6 +4,7 @@
 
 using namespace InsFilterNonHolonomicTypes;
 
+[[nodiscard]]
 class InsFilterNonHolonomicState
 {
     private:
@@ -29,6 +30,19 @@ class InsFilterNonHolonomicState
     /* Constructor */
     InsFilterNonHolonomicState(Quaternion* q_init, GyroscopeBias* gyro_bias_init, 
         NEDPosition* ned_position_init, NEDVelocities* ned_velocities_init, AccelerometerBias* accel_bias_init);
+
+    Quaternion getActualOrientation();
+    GyroscopeBias getActualGyroBias();
+    NEDPosition getActualPosition();
+    NEDVelocities getActualVelocities();
+    AccelerometerBias getActualAccelBias();
+
+    void setActualOrientation();
+    void setActualGyroBias();
+    void setActualPosition();
+    void setActualVelocities();
+    void setActualAccelBias();
+
 
     /* Destructor */
     ~InsFilterNonHolonomicState();

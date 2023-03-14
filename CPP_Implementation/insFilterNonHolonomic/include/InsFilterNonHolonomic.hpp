@@ -6,12 +6,13 @@
 #include <InsFilterNonHolonomicTypes.hpp>
 #include <Eigen/Dense>
 
+
 using namespace Eigen;
 using Eigen::MatrixXd;
 
 class InsFilterNonHolonomic
 {
-    private:
+private:
 
     /* IMU and GPS frequency */
     uint8_t imu_fs = 100, gps_fs = 10;
@@ -23,7 +24,8 @@ class InsFilterNonHolonomic
     uint8_t decimation_factor = 1;
 
     /* Definition of the initial states of the filter (16 variables) */
-    InsFilterNonHolonomicState* filter_state;
+    InsFilterNonHolonomicState* filter_state_old;
+    MatrixXd filter_state;
 
     /** Initial error covariance.
      * This is defined as a 16x16 Identity Matrix with each element in the main diagonal having an 
@@ -38,6 +40,7 @@ class InsFilterNonHolonomic
     Vector3f accelerometer_noise;               /* Accel noise */
     Vector3f accelerometer_bias_noise;          /* Accel bias noise */
     float accel_bias_decay_factor = 1.0f;       /* A decay factor of 0 models gyroscope bias as a white noise process. A decay factor of 1 models the gyroscope bias as a random walk process */
+
     /**
      * The dynamic model of the ground vehicle for this filter assumes there is
      * no side slip or skid during movement. This means that the velocity is 
@@ -49,7 +52,24 @@ class InsFilterNonHolonomic
 
     /* TODO: SPECIFY PARAMETERS IN A .yaml FILE. And check that you read that correctly */
 
-    public:
+    /**
+     * Predict forward the state estimate one time sample, based on current IMU data
+     * 
+     * @param[in] accel_data system accelerations around X,Y and Z axis in m/s^2
+     * @param[in] gyro_data system accelerations around X,Y and Z axis in rad/s
+    */
+    void setState(Vector3f accel_data, Vector3f gyro_data);
+
+    /**
+     * Jacobian of process equations. Compute the Jacobian matrix F 
+     * of the state transition function f(x) with respect to state x.
+     * 
+     * @param[in] accel_data system accelerations around X,Y and Z axis in m/s^2
+     * @param[in] gyro_data system accelerations around X,Y and Z axis in rad/s
+    */
+    MatrixXd stateTransitionJacobianFcn(Vector3f accel_data, Vector3f gyro_data);
+
+public:
     
     /* Base Constructor  */
     InsFilterNonHolonomic(InsFilterNonHolonomicState* initial_state);
@@ -83,7 +103,8 @@ class InsFilterNonHolonomic
      * @param[out] curr_orientation Orientation estimate expressed in the local coordinate system of the filter 
      * @param[out] curr_velocity Velocity estimate expressed in the local coordinate system of the filter in m/s
     */
-    void pose(Vector3f &curr_position, InsFilterNonHolonomicTypes::Quaternion &curr_orientation, Vector3f &curr_velocity);
+    void pose(InsFilterNonHolonomicTypes::NEDPosition &curr_position, InsFilterNonHolonomicTypes::Quaternion &curr_orientation, 
+    InsFilterNonHolonomicTypes::NEDVelocities &curr_velocity);
 
     /**
      * Returns current filter state

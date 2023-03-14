@@ -2,7 +2,7 @@
 
 using namespace InsFilterNonHolonomicTypes;
 
-Quaternion::Quaternion(double q0, double q1, double q2, double q3)
+void Quaternion::setOrientation(double q0, double q1, double q2, double q3)
 {
     this->q0 = q0;
     this->q1 = q1;

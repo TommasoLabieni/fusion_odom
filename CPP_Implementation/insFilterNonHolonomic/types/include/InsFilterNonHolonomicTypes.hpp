@@ -1,5 +1,7 @@
 #pragma once
 
+#include <math.h>
+
 namespace InsFilterNonHolonomicTypes
 {
     /**
@@ -85,12 +87,40 @@ namespace InsFilterNonHolonomicTypes
     class Quaternion
     {
         private:
-        double q0, q1, q2, q3;
+        double &q0;
+        double &q1;
+        double &q2;
+        double &q3;
+
 
         public:
         
         /* Constructor */
-        Quaternion(double q0, double q1, double q2, double q3);
+        Quaternion(double &q0, double &q1, double &q2, double &q3):
+            q0(q0),
+            q1(q1),
+            q2(q2),
+            q3(q3)
+        {};
+
+        void setOrientation(double q0, double q1, double q2, double q3);
+        
+        static void repair(Quaternion &&q)
+        {
+            double n = sqrt(pow(q.q0, 2) + pow(q.q1, 2) + pow(q.q2, 2) + pow(q.q3, 2));
+            q.q0 /= n;
+            q.q1 /= n; 
+            q.q2 /= n;
+            q.q3 /= n;
+
+            if (q.q0 < 0)
+            {
+                q.q0 *= -1;
+                q.q1 *= -1; 
+                q.q2 *= -1;
+                q.q3 *= -1;
+            }
+        }
 
         /* Destructor */
         ~Quaternion();

@@ -10,6 +10,28 @@ InsFilterNonHolonomicState::InsFilterNonHolonomicState(Quaternion* q_init, Gyros
     this->accel_bias = accel_bias_init;
 }
 
+Quaternion InsFilterNonHolonomicState::getActualOrientation()
+{
+    return *this->q;
+}
+GyroscopeBias InsFilterNonHolonomicState::getActualGyroBias()
+{
+    return *this->gyro_bias;
+}
+NEDPosition InsFilterNonHolonomicState::getActualPosition()
+{
+    return *this->ned_position;
+}
+NEDVelocities InsFilterNonHolonomicState::getActualVelocities()
+{
+    return *this->ned_velocities;
+}
+AccelerometerBias InsFilterNonHolonomicState::getActualAccelBias()
+{
+    return *this->accel_bias;
+}
+
+
 InsFilterNonHolonomicState::~InsFilterNonHolonomicState()
 {
     ;
