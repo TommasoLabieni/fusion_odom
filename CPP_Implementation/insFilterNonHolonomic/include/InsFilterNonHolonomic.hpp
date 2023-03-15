@@ -5,6 +5,7 @@
 #include <InsFilterNonHolonomicState.hpp>
 #include <InsFilterNonHolonomicTypes.hpp>
 #include <Eigen/Dense>
+#include <iostream>
 
 
 using namespace Eigen;
@@ -20,8 +21,10 @@ private:
     /* Initial system location [latitude longitude altitude]*/
     gps_fix_t reference_location;
 
-    /* Decimation Factor */
+    /* Decimation Factor used for applying kinematics constraints */
     uint8_t decimation_factor = 1;
+    uint8_t applyConstraintCount = 0;
+
 
     /* Definition of the initial states of the filter (16 variables) */
     InsFilterNonHolonomicState* filter_state_old;
@@ -69,10 +72,59 @@ private:
     */
     MatrixXd stateTransitionJacobianFcn(Vector3f accel_data, Vector3f gyro_data);
 
+    /**
+     * Compute jacobian for multiplicative process noise
+     * The process noise Jacobian G for state vector x and multiplicative
+     * process noise w is L* W * (L.') where:
+     *      L = jacobian of update function f with respect to drive inputs
+     *      W = covariance matrix of multiplicative process noise w.
+    */
+    MatrixXd processNoiseJacobianFcn();
+
+    /**
+     * Process noises covariance
+    */
+    MatrixXd processNoiseCovariance();
+
+    /**
+     * Process new StateCovariance
+    */
+    void setStateCovariance(MatrixXd F, MatrixXd U, MatrixXd G);
+
+
+    MatrixXd measurementFcnKinematics();
+
+    MatrixXd measurementJacobianFcnKinematics();
+
+    MatrixXd measurementNoiseKinematics();
+
+    /**
+     * correct state estimates based on the kinematic constraints
+    */
+   void correctKinematics();
+
 public:
     
     /* Base Constructor  */
+    InsFilterNonHolonomic();
+
+    /* Constructor with InitialState */
     InsFilterNonHolonomic(InsFilterNonHolonomicState* initial_state);
+
+    /**
+     * Set initial state of the filter
+     * 
+    */
+    void setInitState(Vector4d q_init, 
+        Vector3d gyro_bias_init, 
+        Vector3d position_init, 
+        Vector3d velocity_init, 
+        Vector3d accel_bias_init);
+
+    /**
+     * Print current state of the filter
+    */
+   void printCurrentState();
 
     /**
      *  Update Filter state by prediction, using gyroscope AND accelerometer data.

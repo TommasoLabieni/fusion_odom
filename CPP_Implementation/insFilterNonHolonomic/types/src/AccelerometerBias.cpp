@@ -8,8 +8,3 @@ AccelerometerBias::AccelerometerBias(double accel_bias_x, double accel_bias_y, d
     this->accel_bias_y = accel_bias_y;
     this->accel_bias_z = accel_bias_z;
 }
-
-AccelerometerBias::~AccelerometerBias()
-{
-    ;
-}

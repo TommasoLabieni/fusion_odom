@@ -8,8 +8,3 @@ NEDPosition::NEDPosition(double pos_N, double pos_E, double pos_D)
     this->pos_E = pos_E;
     this->pos_D = pos_D;
 }
-
-NEDPosition::~NEDPosition()
-{
-    ;
-}

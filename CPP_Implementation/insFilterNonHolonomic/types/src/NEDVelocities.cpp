@@ -8,8 +8,3 @@ NEDVelocities::NEDVelocities(double vel_N, double vel_E, double vel_D)
     this->vel_E = vel_E;
     this->vel_D = vel_D;
 }
-
-NEDVelocities::~NEDVelocities()
-{
-    ;
-}

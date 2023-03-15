@@ -17,9 +17,6 @@ namespace InsFilterNonHolonomicTypes
         
         /* Constructor */
         AccelerometerBias(double accel_bias_x, double accel_bias_y, double accel_bias_z);
-
-        /* Destructor */
-        ~AccelerometerBias();
     };
 
     /**
@@ -35,9 +32,6 @@ namespace InsFilterNonHolonomicTypes
         
         /* Constructor */
         GyroscopeBias(double gyro_bias_x, double gyro_bias_y, double gyro_bias_z);
-
-        /* Destructor */
-        ~GyroscopeBias();
     };
 
     /**
@@ -53,9 +47,6 @@ namespace InsFilterNonHolonomicTypes
         
         /* Constructor */
         NEDPosition(double pos_N, double pos_E, double pos_D);
-
-        /* Destructor */
-        ~NEDPosition();
     };
 
     /**
@@ -71,9 +62,6 @@ namespace InsFilterNonHolonomicTypes
         
         /* Constructor */
         NEDVelocities(double vel_N, double vel_E, double vel_D);
-
-        /* Destructor */
-        ~NEDVelocities();
     };
 
     /**
@@ -121,9 +109,6 @@ namespace InsFilterNonHolonomicTypes
                 q.q3 *= -1;
             }
         }
-
-        /* Destructor */
-        ~Quaternion();
     };
 
 }

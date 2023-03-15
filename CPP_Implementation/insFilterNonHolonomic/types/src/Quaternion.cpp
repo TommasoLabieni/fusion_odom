@@ -9,8 +9,3 @@ void Quaternion::setOrientation(double q0, double q1, double q2, double q3)
     this->q2 = q2;
     this->q3 = q3;
 }
-
-Quaternion::~Quaternion()
-{
-    ;
-}
