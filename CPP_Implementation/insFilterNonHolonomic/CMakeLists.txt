@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.5)
 project(ins_filter_non_holonomic)
 
+set(Upstream_VERSION 3.5)
+
 # Include InsFilterNonHolonomicState dependency
 include(${CMAKE_CURRENT_SOURCE_DIR}/types/CMakeLists.txt)
 
@@ -20,9 +22,6 @@ endif()
 
 # find dependencies
 find_package(Eigen3 REQUIRED NO_MODULE)
-# find_package(rclcpp REQUIRED)
-# find_package(sensor_msgs REQUIRED)
-# find_package(mmr_common_functions REQUIRED)
 
 # Find include directories
 include_directories(
@@ -30,16 +29,14 @@ include_directories(
   "types/include"
 )
 
-# Adding main executable
-add_executable(main src/main.cpp  )
-
 # Adding InsFilterNonHolonomic library
-add_library(ins_filter_non_holonomic src/InsFilterNonHolonomic.cpp)
+add_library(ins_filter_non_holonomic SHARED src/InsFilterNonHolonomic.cpp)
 
 target_link_libraries(ins_filter_non_holonomic
   Eigen3::Eigen
 )
 
-target_link_libraries(main
+install(TARGETS
   ins_filter_non_holonomic
+  DESTINATION "/usr/lib"
 )
