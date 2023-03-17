@@ -1,0 +1,20 @@
+/gps_imu_fusion_node:
+  ros__parameters:
+    generic:
+      imu_topic: "/imu/data"
+      gps_topic: "/gps/position"
+
+    frequency:
+      imu_fs: 100
+      gps_fs: 10
+
+    noises:
+      zero_velocity_constraint_noise: 0.001
+      gyro_noise: [0.048, 0.048, 0.048]
+      gyro_bias_noise: [0.00000000000004, 0.00000000000004, 0.00000000000004]
+      accel_noise: [0.048, 0.048, 0.048]
+      accel_bias_noise: [0.00000000000004, 0.00000000000004, 0.00000000000004]
+      r_vel: 0.0
+      r_pos: 0.005
+      gyroscope_bias_decay_factor: 1.0
+      accel_bias_decay_factor: 1.0
