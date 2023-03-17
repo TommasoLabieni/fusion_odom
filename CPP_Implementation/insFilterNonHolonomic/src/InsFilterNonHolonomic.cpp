@@ -83,11 +83,12 @@ void InsFilterNonHolonomic::setState(Vector3f accel_data, Vector3f gyro_data)
     double amX = accel_data(0);
     double amY = accel_data(1);
     double amZ = accel_data(2);
+    
     double gmX = gyro_data(0);
     double gmY = gyro_data(1);
     double gmZ = gyro_data(2);
 
-    double dt = 1 / this->imu_fs;
+    double dt = 1.0f / this->imu_fs;
 
     double lambda_gyro = 1 - this->gyroscope_bias_decay_factor;
     double lambda_accel = 1 - this->accel_bias_decay_factor;
@@ -156,7 +157,7 @@ MatrixXd InsFilterNonHolonomic::stateTransitionJacobianFcn(Vector3f accel_data, 
     double abY = this->filter_state(14, 0);
     double abZ = this->filter_state(15, 0);
 
-    double dt = 1 / this->imu_fs;
+    double dt = 1.0f / this->imu_fs;
 
     /* Retrieve sensors data */
     double amX = accel_data(0);
@@ -213,7 +214,7 @@ MatrixXd InsFilterNonHolonomic::processNoiseJacobianFcn()
     // double abY = this->filter_state(14, 0);
     // double abZ = this->filter_state(15, 0);
 
-    double dt = 1 / this->imu_fs;
+    double dt = 1.0f / this->imu_fs;
 
     G <<
         -(dt*q1)/2, -(dt*q2)/2, -(dt*q3)/2, 0, 0, 0,                               0,                               0,                               0, 0, 0, 0,
@@ -240,20 +241,26 @@ MatrixXd InsFilterNonHolonomic::processNoiseJacobianFcn()
 
 MatrixXd InsFilterNonHolonomic::processNoiseCovariance()
 {
-    DiagonalMatrix<double, 3> gyro_var(this->gyroscope_noise(0), this->gyroscope_noise(1), this->gyroscope_noise(2));
-    DiagonalMatrix<double, 3> gyro_bias_var(this->gyroscope_bias_noise(0), this->gyroscope_bias_noise(1), this->gyroscope_bias_noise(2));
-    DiagonalMatrix<double, 3> accel_var(this->accelerometer_noise(0), this->accelerometer_noise(1), this->accelerometer_noise(2));
-    DiagonalMatrix<double, 3> accel_bias_var(this->accelerometer_bias_noise(0),this->accelerometer_bias_noise(1), this->accelerometer_bias_noise(2));
+    DiagonalMatrix<float, 3> gyro_var(this->gyroscope_noise(0), this->gyroscope_noise(1), this->gyroscope_noise(2));
+    DiagonalMatrix<float, 3> gyro_bias_var(this->gyroscope_bias_noise(0), this->gyroscope_bias_noise(1), this->gyroscope_bias_noise(2));
+    DiagonalMatrix<float, 3> accel_var(this->accelerometer_noise(0), this->accelerometer_noise(1), this->accelerometer_noise(2));
+    DiagonalMatrix<float, 3> accel_bias_var(this->accelerometer_bias_noise(0),this->accelerometer_bias_noise(1), this->accelerometer_bias_noise(2));
 
     /* U is a 12x12 DIAGONAL matrix. It just contains the values of the previous diagonal matrices */
     MatrixXd U = Matrix<double, 12, 12>::Zero();
 
-    U.diagonal() << (
-        gyro_var.diagonal()[0], gyro_var.diagonal()[1], gyro_var.diagonal()[2],
-        gyro_bias_var.diagonal()[0], gyro_bias_var.diagonal()[1], gyro_bias_var.diagonal()[2],
-        accel_var.diagonal()[0], accel_var.diagonal()[1], accel_var.diagonal()[2],
-        accel_bias_var.diagonal()[0], accel_bias_var.diagonal()[1], accel_bias_var.diagonal()[2]
-    );
+    U.diagonal()[0] = gyro_var.diagonal()[0];
+    U.diagonal()[1] = gyro_var.diagonal()[1];
+    U.diagonal()[2] = gyro_var.diagonal()[2];
+    U.diagonal()[3] = gyro_bias_var.diagonal()[0];
+    U.diagonal()[4] = gyro_bias_var.diagonal()[1];
+    U.diagonal()[5] = gyro_bias_var.diagonal()[2];
+    U.diagonal()[6] = accel_var.diagonal()[0];
+    U.diagonal()[7] = accel_var.diagonal()[1];
+    U.diagonal()[8] = accel_var.diagonal()[2];
+    U.diagonal()[9] = accel_bias_var.diagonal()[0];
+    U.diagonal()[10] = accel_bias_var.diagonal()[1];
+    U.diagonal()[11] = accel_bias_var.diagonal()[2];
 
     return U;
 }
@@ -266,10 +273,9 @@ void InsFilterNonHolonomic::setStateCovariance(MatrixXd F, MatrixXd U, MatrixXd 
      * U = processNoiseCovariance
      * G = processNoiseJacobianFcn
     */
-
     MatrixXd Q = Matrix<double, 16, 16>();
-    Q = G * U * G.inverse();
-    this->state_covariance = F * this->state_covariance * F.inverse() + Q;
+    Q = G * U * G.transpose();
+    this->state_covariance = F * this->state_covariance * F.transpose() + Q;
 }
 
 MatrixXd InsFilterNonHolonomic::measurementFcnKinematics()
@@ -350,33 +356,19 @@ void InsFilterNonHolonomic::correctKinematics()
     MatrixXd H = this->measurementJacobianFcnKinematics();
     MatrixXd R = this->measurementNoiseKinematics();
     Vector2d z = Vector2d::Zero();
-
-    MatrixXd innovation_covariance = H * this->state_covariance * H.inverse() + R;
+    MatrixXd innovation_covariance = H * this->state_covariance * H.transpose() + R;
     MatrixXd innovation = z - h;
-    MatrixXd W = this->state_covariance * H.inverse();
+    MatrixXd W = Matrix<double, 16, 2>();
+
+    W = this->state_covariance * H.transpose();
 
     double ic_md = innovation_covariance(0,0) * innovation_covariance(1,1);
     double ic_sd = innovation_covariance(0,1) * innovation_covariance(1,0);
     double d_diff = ic_md - ic_sd;
 
-    W << 
-          (W(0,0)*innovation_covariance(1,1)    - W(0,1)*innovation_covariance(1,0))/(d_diff),      -(W(0,0)*innovation_covariance(0,1)     -  W(0,1)*innovation_covariance(0,0))/(d_diff),
-          (W(1,0)*innovation_covariance(1,1)    - W(0,1)*innovation_covariance(1,0))/(d_diff),      -(W(1,0)*innovation_covariance(0,1)     -  W(0,1)*innovation_covariance(0,0))/(d_diff),
-          (W(2,0)*innovation_covariance(1,1)    - W(0,2)*innovation_covariance(1,0))/(d_diff),      -(W(2,0)*innovation_covariance(0,1)     -  W(0,2)*innovation_covariance(0,0))/(d_diff),
-          (W(3,0)*innovation_covariance(1,1)    - W(0,3)*innovation_covariance(1,0))/(d_diff),      -(W(3,0)*innovation_covariance(0,1)     -  W(0,3)*innovation_covariance(0,0))/(d_diff),
-          (W(4,0)*innovation_covariance(1,1)    - W(0,4)*innovation_covariance(1,0))/(d_diff),      -(W(4,0)*innovation_covariance(0,1)     -  W(0,4)*innovation_covariance(0,0))/(d_diff),
-          (W(5,0)*innovation_covariance(1,1)    - W(0,5)*innovation_covariance(1,0))/(d_diff),      -(W(5,0)*innovation_covariance(0,1)     -  W(0,5)*innovation_covariance(0,0))/(d_diff),
-          (W(6,0)*innovation_covariance(1,1)    - W(0,6)*innovation_covariance(1,0))/(d_diff),      -(W(6,0)*innovation_covariance(0,1)     -  W(0,6)*innovation_covariance(0,0))/(d_diff),
-          (W(7,0)*innovation_covariance(1,1)    - W(0,7)*innovation_covariance(1,0))/(d_diff),      -(W(7,0)*innovation_covariance(0,1)     -  W(0,7)*innovation_covariance(0,0))/(d_diff),
-          (W(8,0)*innovation_covariance(1,1)    - W(0,8)*innovation_covariance(1,0))/(d_diff),      -(W(8,0)*innovation_covariance(0,1)     -  W(0,8)*innovation_covariance(0,0))/(d_diff),
-          (W(9,0)*innovation_covariance(1,1)    - W(0,9)*innovation_covariance(1,0))/(d_diff),      -(W(9,0)*innovation_covariance(0,1)     -  W(0,9)*innovation_covariance(0,0))/(d_diff),
-          (W(10,0)*innovation_covariance(1,1)   - W(0,10)*innovation_covariance(1,0))/(d_diff),     -(W(10,0)*innovation_covariance(0,1)    -  W(0,10)*innovation_covariance(0,0))/(d_diff),
-          (W(11,0)*innovation_covariance(1,1)   - W(0,11)*innovation_covariance(1,0))/(d_diff),     -(W(11,0)*innovation_covariance(0,1)    -  W(0,11)*innovation_covariance(0,0))/(d_diff),
-          (W(12,0)*innovation_covariance(1,1)   - W(0,12)*innovation_covariance(1,0))/(d_diff),     -(W(12,0)*innovation_covariance(0,1)    -  W(0,12)*innovation_covariance(0,0))/(d_diff),
-          (W(13,0)*innovation_covariance(1,1)   - W(0,13)*innovation_covariance(1,0))/(d_diff),     -(W(13,0)*innovation_covariance(0,1)    -  W(0,13)*innovation_covariance(0,0))/(d_diff),
-          (W(14,0)*innovation_covariance(1,1)   - W(0,14)*innovation_covariance(1,0))/(d_diff),     -(W(14,0)*innovation_covariance(0,1)    -  W(0,14)*innovation_covariance(0,0))/(d_diff),
-          (W(15,0)*innovation_covariance(1,1)   - W(0,15)*innovation_covariance(1,0))/(d_diff),     -(W(15,0)*innovation_covariance(0,1)    -  W(0,15)*innovation_covariance(0,0))/(d_diff)
-    ;
+
+    /* Matrix division */
+    W = innovation_covariance.transpose().colPivHouseholderQr().solve(W.transpose()).transpose();  
 
     this->filter_state = this->filter_state + W * innovation;
     this->state_covariance = this->state_covariance - W * H * this->state_covariance;
@@ -386,7 +378,8 @@ void InsFilterNonHolonomic::correctKinematics()
         this->filter_state(2, 0),
         this->filter_state(3, 0)
     });
-    innovation = innovation.transpose();
+    MatrixXd tmp = innovation.transpose();
+    innovation = tmp;
 }
 
 void InsFilterNonHolonomic::predict(Vector3f accel_data, Vector3f gyro_data)
@@ -405,6 +398,7 @@ void InsFilterNonHolonomic::predict(Vector3f accel_data, Vector3f gyro_data)
     if(this->applyConstraintCount == this->decimation_factor)
     {
         this->correctKinematics();
+
         this->applyConstraintCount = 0;
     }
 }
@@ -433,28 +427,40 @@ void InsFilterNonHolonomic::pose(InsFilterNonHolonomicTypes::NEDPosition &curr_p
     // curr_velocity = act_state.getActualVelocities();
 }
 
+void InsFilterNonHolonomic::printFilterConstraints()
+{
+    std::cout << "gyroscope_noise: " << this->gyroscope_noise << "\n";
+    std::cout << "gyroscope_bias_noise: " << this->gyroscope_bias_noise << "\n";
+    std::cout << "gyroscope_bias_decay_factor: " << this->gyroscope_bias_decay_factor << "\n";
+    std::cout << "accelerometer_noise: " << this->accelerometer_noise << "\n";
+    std::cout << "accelerometer_bias_noise: " << this->accelerometer_bias_noise << "\n";
+    std::cout << "accel_bias_decay_factor: " << this->accel_bias_decay_factor << "\n";
+    std::cout << "r_vel: " << this->r_vel << "\n";
+    std::cout << "r_pos: " << this->r_pos << "\n";
+}
+
 void InsFilterNonHolonomic::printCurrentState()
 {
-    std::cout << "Quaternion q0: " << this->filter_state(0,0) << "\n";
-    std::cout << "Quaternion q1: " << this->filter_state(1,0) << "\n";
-    std::cout << "Quaternion q2: " << this->filter_state(2,0) << "\n";
-    std::cout << "Quaternion q3: " << this->filter_state(3,0) << "\n";
+    std::cerr << "Quaternion q0: " << this->filter_state(0,0) << "\n";
+    std::cerr << "Quaternion q1: " << this->filter_state(1,0) << "\n";
+    std::cerr << "Quaternion q2: " << this->filter_state(2,0) << "\n";
+    std::cerr << "Quaternion q3: " << this->filter_state(3,0) << "\n";
 
-    std::cout << "Gyscope Bias x: " << this->filter_state(4,0) << "\n";
-    std::cout << "Gyscope Bias y: " << this->filter_state(5,0) << "\n";
-    std::cout << "Gyscope Bias z: " << this->filter_state(6,0) << "\n";
+    std::cerr << "Gyscope Bias x: " << this->filter_state(4,0) << "\n";
+    std::cerr << "Gyscope Bias y: " << this->filter_state(5,0) << "\n";
+    std::cerr << "Gyscope Bias z: " << this->filter_state(6,0) << "\n";
 
-    std::cout << "Position N: " << this->filter_state(7,0) << "\n";
-    std::cout << "Position E: " << this->filter_state(8,0) << "\n";
-    std::cout << "Position D: " << this->filter_state(9,0) << "\n";
+    std::cerr << "Position N: " << this->filter_state(7,0) << "\n";
+    std::cerr << "Position E: " << this->filter_state(8,0) << "\n";
+    std::cerr << "Position D: " << this->filter_state(9,0) << "\n";
 
-    std::cout << "Velocity N: " << this->filter_state(10,0) << "\n";
-    std::cout << "Velocity E: " << this->filter_state(11,0) << "\n";
-    std::cout << "Velocity D: " << this->filter_state(12,0) << "\n";
+    std::cerr << "Velocity N: " << this->filter_state(10,0) << "\n";
+    std::cerr << "Velocity E: " << this->filter_state(11,0) << "\n";
+    std::cerr << "Velocity D: " << this->filter_state(12,0) << "\n";
 
-    std::cout << "Accelerometer Bias x: " << this->filter_state(13,0) << "\n";
-    std::cout << "Accelerometer Bias y: " << this->filter_state(14,0) << "\n";
-    std::cout << "Accelerometer Bias z: " << this->filter_state(15,0) << "\n";
+    std::cerr << "Accelerometer Bias x: " << this->filter_state(13,0) << "\n";
+    std::cerr << "Accelerometer Bias y: " << this->filter_state(14,0) << "\n";
+    std::cerr << "Accelerometer Bias z: " << this->filter_state(15,0) << "\n";
 }
 
 InsFilterNonHolonomic::~InsFilterNonHolonomic()

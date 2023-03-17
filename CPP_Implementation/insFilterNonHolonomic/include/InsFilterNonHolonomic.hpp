@@ -48,29 +48,6 @@ private:
     float r_pos = 0.005f;                       /* Noise of measured position */
 
     /**
-     * Load parameters from YAML file
-     * 
-     * @param[in] gyroscope_noise Vector defining noise of the gyroscope for X, Y and Z axis
-     * @param[in] gyroscope_bias_noise Vector defining BIAS of the noise of the gyroscope for X, Y and Z axis
-     * @param[in] accelerometer_noise Vector defining noise of the accelerometer for X, Y and Z axis
-     * @param[in] accelerometer_bias_noise Vector defining BIAS of the noise of the accelerometer for X, Y and Z axis
-     * @param[in,optional] r_vel Noise of measured velocity
-     * @param[in,optional] r_pos Noise of measured position
-     * @param[in,optional] gyroscope_bias_decay_factor Gyroscope bias noise decay factor
-     * @param[in,optional] accel_bias_decay_factor Accelerometer bias noise decay factor
-     * 
-    */
-    void loadParameters(Vector3f gyroscope_noise,
-        Vector3f gyroscope_bias_noise,
-        Vector3f accelerometer_noise,
-        Vector3f accelerometer_bias_noise,
-        float r_vel,
-        float r_pos,
-        float gyroscope_bias_decay_factor,
-        float accel_bias_decay_factor
-    );
-
-    /**
      * The dynamic model of the ground vehicle for this filter assumes there is
      * no side slip or skid during movement. This means that the velocity is 
      * constrained to only the forward body axis. The other two velocity axis 
@@ -134,8 +111,29 @@ public:
     /* Base Constructor  */
     InsFilterNonHolonomic();
 
-    /* Constructor with InitialState */
-    InsFilterNonHolonomic(InsFilterNonHolonomicState* initial_state);
+    /**
+     * Load parameters inital noise parameters 
+     * 
+     * @param[in] gyroscope_noise Vector defining noise of the gyroscope for X, Y and Z axis
+     * @param[in] gyroscope_bias_noise Vector defining BIAS of the noise of the gyroscope for X, Y and Z axis
+     * @param[in] accelerometer_noise Vector defining noise of the accelerometer for X, Y and Z axis
+     * @param[in] accelerometer_bias_noise Vector defining BIAS of the noise of the accelerometer for X, Y and Z axis
+     * @param[in,optional] r_vel Noise of measured velocity
+     * @param[in,optional] r_pos Noise of measured position
+     * @param[in,optional] gyroscope_bias_decay_factor Gyroscope bias noise decay factor
+     * @param[in,optional] accel_bias_decay_factor Accelerometer bias noise decay factor
+     * 
+    */
+    void loadParameters(Vector3f gyroscope_noise,
+        Vector3f gyroscope_bias_noise,
+        Vector3f accelerometer_noise,
+        Vector3f accelerometer_bias_noise,
+        float r_vel,
+        float r_pos,
+        float gyroscope_bias_decay_factor,
+        float accel_bias_decay_factor
+    );
+
 
     /**
      * Set initial state of the filter
@@ -146,6 +144,11 @@ public:
         Vector3d position_init, 
         Vector3d velocity_init, 
         Vector3d accel_bias_init);
+
+    /**
+     * Print filter constraints
+    */
+    void printFilterConstraints();
 
     /**
      * Print current state of the filter
