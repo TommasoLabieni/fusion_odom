@@ -34,6 +34,7 @@ add_library(ins_filter_non_holonomic SHARED src/InsFilterNonHolonomic.cpp)
 
 target_link_libraries(ins_filter_non_holonomic
   Eigen3::Eigen
+  ins_filter_non_holonomic_state
 )
 
 install(TARGETS

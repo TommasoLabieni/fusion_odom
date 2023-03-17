@@ -1,21 +1,31 @@
 #include <InsFilterNonHolonomic.hpp>
 
-InsFilterNonHolonomic::InsFilterNonHolonomic(InsFilterNonHolonomicState* initial_state)
-{
-    this->filter_state_old = initial_state;
-    
-    this->filter_state = Matrix<double, 16, 1>();
-
-    /* create initial error covariance */
-    this->state_covariance = Matrix<double, 16, 16>::Identity();
-}
-
 InsFilterNonHolonomic::InsFilterNonHolonomic()
 {
     this->filter_state = Matrix<double, 16, 1>();
 
     /* create initial error covariance */
     this->state_covariance = Matrix<double, 16, 16>::Identity();
+}
+
+void InsFilterNonHolonomic::loadParameters(Vector3f gyroscope_noise,
+    Vector3f gyroscope_bias_noise,
+    Vector3f accelerometer_noise,
+    Vector3f accelerometer_bias_noise,
+    float r_vel = 0.0f,
+    float r_pos = 0.005f,
+    float gyroscope_bias_decay_factor = 1.0f,
+    float accel_bias_decay_factor = 1.0f
+)
+{
+    this->gyroscope_noise = gyroscope_noise;
+    this->gyroscope_bias_noise = gyroscope_bias_noise;
+    this->accelerometer_noise = accelerometer_noise;
+    this->accelerometer_bias_noise = accelerometer_bias_noise;
+    this->r_vel = r_vel;
+    this->r_pos = r_pos;
+    this->gyroscope_bias_decay_factor = gyroscope_bias_decay_factor;
+    this->accel_bias_decay_factor = accel_bias_decay_factor;
 }
 
 void InsFilterNonHolonomic::setInitState(Vector4d q_init, 
@@ -45,7 +55,6 @@ void InsFilterNonHolonomic::setInitState(Vector4d q_init,
     this->filter_state(13, 0) = accel_bias_init(0);
     this->filter_state(14, 0) = accel_bias_init(1);
     this->filter_state(15, 0) = accel_bias_init(2);
-
 }
 
 
@@ -137,12 +146,12 @@ MatrixXd InsFilterNonHolonomic::stateTransitionJacobianFcn(Vector3f accel_data, 
     double gbX = this->filter_state(4, 0);
     double gbY = this->filter_state(5, 0);
     double gbZ = this->filter_state(6, 0);
-    double pn = this->filter_state(7, 0);
-    double pe = this->filter_state(8, 0);
-    double pd = this->filter_state(9, 0);
-    double vn = this->filter_state(10, 0);
-    double ve = this->filter_state(11, 0);
-    double vd = this->filter_state(12, 0);
+    // double pn = this->filter_state(7, 0);
+    // double pe = this->filter_state(8, 0);
+    // double pd = this->filter_state(9, 0);
+    // double vn = this->filter_state(10, 0);
+    // double ve = this->filter_state(11, 0);
+    // double vd = this->filter_state(12, 0);
     double abX = this->filter_state(13, 0);
     double abY = this->filter_state(14, 0);
     double abZ = this->filter_state(15, 0);
@@ -191,18 +200,18 @@ MatrixXd InsFilterNonHolonomic::processNoiseJacobianFcn()
     double q1 = this->filter_state(1, 0);
     double q2 = this->filter_state(2, 0);
     double q3 = this->filter_state(3, 0);
-    double gbX = this->filter_state(4, 0);
-    double gbY = this->filter_state(5, 0);
-    double gbZ = this->filter_state(6, 0);
-    double pn = this->filter_state(7, 0);
-    double pe = this->filter_state(8, 0);
-    double pd = this->filter_state(9, 0);
-    double vn = this->filter_state(10, 0);
-    double ve = this->filter_state(11, 0);
-    double vd = this->filter_state(12, 0);
-    double abX = this->filter_state(13, 0);
-    double abY = this->filter_state(14, 0);
-    double abZ = this->filter_state(15, 0);
+    // double gbX = this->filter_state(4, 0);
+    // double gbY = this->filter_state(5, 0);
+    // double gbZ = this->filter_state(6, 0);
+    // double pn = this->filter_state(7, 0);
+    // double pe = this->filter_state(8, 0);
+    // double pd = this->filter_state(9, 0);
+    // double vn = this->filter_state(10, 0);
+    // double ve = this->filter_state(11, 0);
+    // double vd = this->filter_state(12, 0);
+    // double abX = this->filter_state(13, 0);
+    // double abY = this->filter_state(14, 0);
+    // double abZ = this->filter_state(15, 0);
 
     double dt = 1 / this->imu_fs;
 
@@ -272,18 +281,18 @@ MatrixXd InsFilterNonHolonomic::measurementFcnKinematics()
     double q1 = this->filter_state(1, 0);
     double q2 = this->filter_state(2, 0);
     double q3 = this->filter_state(3, 0);
-    double gbX = this->filter_state(4, 0);
-    double gbY = this->filter_state(5, 0);
-    double gbZ = this->filter_state(6, 0);
-    double pn = this->filter_state(7, 0);
-    double pe = this->filter_state(8, 0);
-    double pd = this->filter_state(9, 0);
+    // double gbX = this->filter_state(4, 0);
+    // double gbY = this->filter_state(5, 0);
+    // double gbZ = this->filter_state(6, 0);
+    // double pn = this->filter_state(7, 0);
+    // double pe = this->filter_state(8, 0);
+    // double pd = this->filter_state(9, 0);
     double vn = this->filter_state(10, 0);
     double ve = this->filter_state(11, 0);
     double vd = this->filter_state(12, 0);
-    double abX = this->filter_state(13, 0);
-    double abY = this->filter_state(14, 0);
-    double abZ = this->filter_state(15, 0);
+    // double abX = this->filter_state(13, 0);
+    // double abY = this->filter_state(14, 0);
+    // double abZ = this->filter_state(15, 0);
 
     h <<
         q0*(q1*vd + q0*ve - q3*vn) + q1*(q0*vd - q1*ve + q2*vn) + q2*(q3*vd + q2*ve + q1*vn) - q3*(q3*ve - q2*vd + q0*vn),
@@ -302,18 +311,18 @@ MatrixXd InsFilterNonHolonomic::measurementJacobianFcnKinematics()
     double q1 = this->filter_state(1, 0);
     double q2 = this->filter_state(2, 0);
     double q3 = this->filter_state(3, 0);
-    double gbX = this->filter_state(4, 0);
-    double gbY = this->filter_state(5, 0);
-    double gbZ = this->filter_state(6, 0);
-    double pn = this->filter_state(7, 0);
-    double pe = this->filter_state(8, 0);
-    double pd = this->filter_state(9, 0);
+    // double gbX = this->filter_state(4, 0);
+    // double gbY = this->filter_state(5, 0);
+    // double gbZ = this->filter_state(6, 0);
+    // double pn = this->filter_state(7, 0);
+    // double pe = this->filter_state(8, 0);
+    // double pd = this->filter_state(9, 0);
     double vn = this->filter_state(10, 0);
     double ve = this->filter_state(11, 0);
     double vd = this->filter_state(12, 0);
-    double abX = this->filter_state(13, 0);
-    double abY = this->filter_state(14, 0);
-    double abZ = this->filter_state(15, 0);
+    // double abX = this->filter_state(13, 0);
+    // double abY = this->filter_state(14, 0);
+    // double abZ = this->filter_state(15, 0);
 
     H <<
         2*q1*vd + 2*q0*ve - 2*q3*vn, 2*q0*vd - 2*q1*ve + 2*q2*vn, 2*q3*vd + 2*q2*ve + 2*q1*vn, 2*q2*vd - 2*q3*ve - 2*q0*vn, 0, 0, 0, 0, 0, 0, 2*q1*q2 - 2*q0*q3, pow(q0,2) - pow(q1,2) + pow(q2,2) - pow(q3,2),         2*q0*q1 + 2*q2*q3, 0, 0, 0,
@@ -414,9 +423,6 @@ void InsFilterNonHolonomic::correct(
 void InsFilterNonHolonomic::pose(InsFilterNonHolonomicTypes::NEDPosition &curr_position, InsFilterNonHolonomicTypes::Quaternion &curr_orientation, 
     InsFilterNonHolonomicTypes::NEDVelocities &curr_velocity)
 {
-    // /* Retrieve actual filter state */
-    // InsFilterNonHolonomicState act_state = this->getCurrentState();
-
     // /* Set actual position */
     // curr_position = act_state.getActualPosition();
 
@@ -425,11 +431,6 @@ void InsFilterNonHolonomic::pose(InsFilterNonHolonomicTypes::NEDPosition &curr_p
 
     // /* Set actual velocities */
     // curr_velocity = act_state.getActualVelocities();
-}
-
-InsFilterNonHolonomicState InsFilterNonHolonomic::getCurrentState()
-{
-    return *(this->filter_state_old);
 }
 
 void InsFilterNonHolonomic::printCurrentState()

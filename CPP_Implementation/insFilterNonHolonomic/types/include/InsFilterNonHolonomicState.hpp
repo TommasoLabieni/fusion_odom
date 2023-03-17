@@ -4,7 +4,6 @@
 
 using namespace InsFilterNonHolonomicTypes;
 
-[[nodiscard]]
 class InsFilterNonHolonomicState
 {
     private:
@@ -42,9 +41,4 @@ class InsFilterNonHolonomicState
     void setActualPosition();
     void setActualVelocities();
     void setActualAccelBias();
-
-
-    /* Destructor */
-    ~InsFilterNonHolonomicState();
-
 };

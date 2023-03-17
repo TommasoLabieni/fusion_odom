@@ -30,9 +30,3 @@ AccelerometerBias InsFilterNonHolonomicState::getActualAccelBias()
 {
     return *this->accel_bias;
 }
-
-
-InsFilterNonHolonomicState::~InsFilterNonHolonomicState()
-{
-    ;
-}
