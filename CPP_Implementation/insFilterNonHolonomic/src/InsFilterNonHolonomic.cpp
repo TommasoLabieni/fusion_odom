@@ -5,7 +5,7 @@ InsFilterNonHolonomic::InsFilterNonHolonomic()
     this->filter_state = Matrix<double, 16, 1>();
 
     /* create initial error covariance */
-    this->state_covariance = Matrix<double, 16, 16>::Identity();
+    this->state_covariance = Matrix<double, 16, 16>::Identity() * 1e-9;
 }
 
 void InsFilterNonHolonomic::loadParameters(Vector3f gyroscope_noise,
@@ -368,7 +368,8 @@ void InsFilterNonHolonomic::correctKinematics()
 
 
     /* Matrix division */
-    W = innovation_covariance.transpose().colPivHouseholderQr().solve(W.transpose()).transpose();  
+    // W = innovation_covariance.transpose().colPivHouseholderQr().solve(W.transpose()).transpose();  
+    W = W*innovation_covariance.inverse();
 
     this->filter_state = this->filter_state + W * innovation;
     this->state_covariance = this->state_covariance - W * H * this->state_covariance;
@@ -414,17 +415,17 @@ void InsFilterNonHolonomic::correct(
     ;
 }
 
-void InsFilterNonHolonomic::pose(InsFilterNonHolonomicTypes::NEDPosition &curr_position, InsFilterNonHolonomicTypes::Quaternion &curr_orientation, 
-    InsFilterNonHolonomicTypes::NEDVelocities &curr_velocity)
+void InsFilterNonHolonomic::pose(Vector3d &curr_position, Vector4d &curr_orientation, 
+    Vector3d &curr_velocity)
 {
-    // /* Set actual position */
-    // curr_position = act_state.getActualPosition();
+    /* Set actual position */
+    curr_position = Vector3d(this->filter_state(7,0),this->filter_state(8,0), this->filter_state(9,0));
 
-    // /* TODO: Set actual orientation */
-    // // curr_orientation = InsFilterNonHolonomicTypes::Quaternion(x,x,x,x);
+    /* Set actual orientation */
+    curr_orientation = Vector4d(this->filter_state(0,0), this->filter_state(1,0),this->filter_state(2,0), this->filter_state(3,0));
 
-    // /* Set actual velocities */
-    // curr_velocity = act_state.getActualVelocities();
+    /* Set actual velocities */
+    curr_velocity = Vector3d(this->filter_state(10,0),this->filter_state(11,0), this->filter_state(12,0));
 }
 
 void InsFilterNonHolonomic::printFilterConstraints()
@@ -461,6 +462,11 @@ void InsFilterNonHolonomic::printCurrentState()
     std::cerr << "Accelerometer Bias x: " << this->filter_state(13,0) << "\n";
     std::cerr << "Accelerometer Bias y: " << this->filter_state(14,0) << "\n";
     std::cerr << "Accelerometer Bias z: " << this->filter_state(15,0) << "\n";
+}
+
+void InsFilterNonHolonomic::printCurrentStateCovariance()
+{
+    std::cerr << this->state_covariance << "\n\n";
 }
 
 InsFilterNonHolonomic::~InsFilterNonHolonomic()

@@ -156,6 +156,11 @@ public:
    void printCurrentState();
 
     /**
+     * Print current state covariant of the filter
+    */
+    void printCurrentStateCovariance();
+
+    /**
      *  Update Filter state by prediction, using gyroscope AND accelerometer data.
      * 
      * @param[in] accel_data system accelerations around X,Y and Z axis in m/s^2
@@ -184,8 +189,8 @@ public:
      * @param[out] curr_orientation Orientation estimate expressed in the local coordinate system of the filter 
      * @param[out] curr_velocity Velocity estimate expressed in the local coordinate system of the filter in m/s
     */
-    void pose(InsFilterNonHolonomicTypes::NEDPosition &curr_position, InsFilterNonHolonomicTypes::Quaternion &curr_orientation, 
-    InsFilterNonHolonomicTypes::NEDVelocities &curr_velocity);
+    void pose(Vector3d &curr_position, Vector4d &curr_orientation, 
+        Vector3d &curr_velocity);
 
     /* Destructor */
     ~InsFilterNonHolonomic();
