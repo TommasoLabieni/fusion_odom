@@ -6,8 +6,13 @@
 #include <sensor_msgs/msg/imu.hpp>
 #include <sensor_msgs/msg/nav_sat_fix.hpp>
 #include <geometry_msgs/msg/quaternion.hpp>
+#include "geometry_msgs/msg/transform_stamped.hpp"
+#include "tf2/LinearMath/Quaternion.h"
+#include "tf2_ros/transform_broadcaster.h"
 
 #include <InsFilterNonHolonomic.hpp>
+
+#include <fstream>
 
 using namespace std;
 using namespace Eigen;
@@ -31,6 +36,15 @@ private:
     double gyroscope_bias_decay_factor = 1.0f;
     double accel_bias_decay_factor = 1.0f;
 
+    /**
+     * TODO: Create log files
+     */
+    uint8_t count_imu_topics = 0;
+    ofstream predictFile;
+    double vx = 0;
+    double vy = 0;
+
+
     /* IMU and GPS ROS 2 topics */
     string imu_topic, gps_topic; 
 
@@ -42,6 +56,9 @@ private:
 
     /* GPS data subscriber */
     rclcpp::Subscription<sensor_msgs::msg::NavSatFix>::SharedPtr gps_sub;
+
+    /* TF2 broadcaster */
+    std::unique_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster_;
 
     /**
      * Load ROS 2 parameters function
@@ -58,6 +75,13 @@ private:
     */
     void gpsDataCallback(const sensor_msgs::msg::NavSatFix::SharedPtr gps_data);
 
+    /**
+     * Update TF Pose
+     * 
+     * @param[in] p Vehicle position
+     * @param[in] q Vehicle orientation
+    */
+    void updateTf(Vector3d p, geometry_msgs::msg::Quaternion q);
 
 public:
     /* Default constructor */
