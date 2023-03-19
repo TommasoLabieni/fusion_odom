@@ -1,15 +1,14 @@
-close all
+% close all
 clear
 clc
 
 imuFs = 100;
 gpsFs = 10;
 
-format long     %% evita di troncare i decimali
+format long
 
 %% Read bag
 bag = rosbag('/home/tommaso/bags/gps_imu_two_laps_10hz.bag');
-
 
 gpsTopic = select(bag,'Topic','/gps/position');
 imuTopic = select(bag,'Topic','/imu/data');
@@ -96,10 +95,9 @@ gndFusion.AccelerometerBiasNoise = 4e-14; %e-14
 % Initial error covariance
 gndFusion.StateCovariance = 1e-9*eye(16);
 
-
 useErrScope = false; % Turn on the streaming error plot
-usePoseView = true;  % Turn on the 3D pose viewer
-use2DView = ~usePoseView;
+usePoseView = false;  % Turn on the 3D pose viewer
+use2DView = usePoseView;
 
 if useErrScope
     errscope = HelperScrollingPlotter( ...
@@ -129,7 +127,6 @@ if usePoseView
         'ReferenceFrame', 'NED');
 end
 
-
 totalSimTime = round(bag.EndTime - bag.StartTime) - 1; % seconds
 
 % Log data for final metric computation.
@@ -148,6 +145,8 @@ if use2DView
     figure();
 end
 
+
+%% Main Loop
 for sampleIdx = 1:numsamples
     % Predict loop at IMU update frequency.
     for i = 1:imuSamplesPerGPS
@@ -226,14 +225,9 @@ for sampleIdx = 1:numsamples
     % Update the filter states based on the GPS data.
     fusegps(gndFusion, lla, Rpos, gpsVel, Rvel);
     index_gps = index_gps + 1;
+
+    java.lang.Thread.sleep(100)  % in ms!
 end
 
 
-
-
-
-
-
-
-
-
+%% unscentened Kalman Filter per vy su simulink: 
