@@ -8,14 +8,15 @@ InsFilterNonHolonomic::InsFilterNonHolonomic()
     this->state_covariance = Matrix<double, 16, 16>::Identity() * 1e-9;
 }
 
-void InsFilterNonHolonomic::loadParameters(Vector3f gyroscope_noise,
-    Vector3f gyroscope_bias_noise,
-    Vector3f accelerometer_noise,
-    Vector3f accelerometer_bias_noise,
-    float r_vel = 0.0f,
-    float r_pos = 0.005f,
-    float gyroscope_bias_decay_factor = 1.0f,
-    float accel_bias_decay_factor = 1.0f
+void InsFilterNonHolonomic::loadParameters(Vector3d gyroscope_noise,
+    Vector3d gyroscope_bias_noise,
+    Vector3d accelerometer_noise,
+    Vector3d accelerometer_bias_noise,
+    double r_vel = 0.0f,
+    double r_pos = 0.005f,
+    double gyroscope_bias_decay_factor = 1.0f,
+    double accel_bias_decay_factor = 1.0f,
+    double zero_velocity_constraint_noise = 1e-3
 )
 {
     this->gyroscope_noise = gyroscope_noise;
@@ -26,6 +27,7 @@ void InsFilterNonHolonomic::loadParameters(Vector3f gyroscope_noise,
     this->r_pos = r_pos;
     this->gyroscope_bias_decay_factor = gyroscope_bias_decay_factor;
     this->accel_bias_decay_factor = accel_bias_decay_factor;
+    this->zero_velocity_constraint_noise = zero_velocity_constraint_noise;
 }
 
 void InsFilterNonHolonomic::setInitState(Vector4d q_init, 
@@ -57,9 +59,14 @@ void InsFilterNonHolonomic::setInitState(Vector4d q_init,
     this->filter_state(15, 0) = accel_bias_init(2);
 }
 
+void InsFilterNonHolonomic::setRefLocation(double latitude, double longitude, double altitude)
+{
+    this->reference_location.latitude = latitude;
+    this->reference_location.longitude = longitude;
+    this->reference_location.altitude = altitude;
+}
 
-
-void InsFilterNonHolonomic::setState(Vector3f accel_data, Vector3f gyro_data)
+void InsFilterNonHolonomic::setState(Vector3d accel_data, Vector3d gyro_data)
 {
     /* Retrieve actual filter state variables */
     double q0 = this->filter_state(0, 0);
@@ -135,7 +142,7 @@ void InsFilterNonHolonomic::setState(Vector3f accel_data, Vector3f gyro_data)
 
 }
 
-MatrixXd InsFilterNonHolonomic::stateTransitionJacobianFcn(Vector3f accel_data, Vector3f gyro_data)
+MatrixXd InsFilterNonHolonomic::stateTransitionJacobianFcn(Vector3d accel_data, Vector3d gyro_data)
 {
     MatrixXd F = Matrix<double, 16, 16>();
 
@@ -241,10 +248,10 @@ MatrixXd InsFilterNonHolonomic::processNoiseJacobianFcn()
 
 MatrixXd InsFilterNonHolonomic::processNoiseCovariance()
 {
-    DiagonalMatrix<float, 3> gyro_var(this->gyroscope_noise(0), this->gyroscope_noise(1), this->gyroscope_noise(2));
-    DiagonalMatrix<float, 3> gyro_bias_var(this->gyroscope_bias_noise(0), this->gyroscope_bias_noise(1), this->gyroscope_bias_noise(2));
-    DiagonalMatrix<float, 3> accel_var(this->accelerometer_noise(0), this->accelerometer_noise(1), this->accelerometer_noise(2));
-    DiagonalMatrix<float, 3> accel_bias_var(this->accelerometer_bias_noise(0),this->accelerometer_bias_noise(1), this->accelerometer_bias_noise(2));
+    DiagonalMatrix<double, 3> gyro_var(this->gyroscope_noise(0), this->gyroscope_noise(1), this->gyroscope_noise(2));
+    DiagonalMatrix<double, 3> gyro_bias_var(this->gyroscope_bias_noise(0), this->gyroscope_bias_noise(1), this->gyroscope_bias_noise(2));
+    DiagonalMatrix<double, 3> accel_var(this->accelerometer_noise(0), this->accelerometer_noise(1), this->accelerometer_noise(2));
+    DiagonalMatrix<double, 3> accel_bias_var(this->accelerometer_bias_noise(0),this->accelerometer_bias_noise(1), this->accelerometer_bias_noise(2));
 
     /* U is a 12x12 DIAGONAL matrix. It just contains the values of the previous diagonal matrices */
     MatrixXd U = Matrix<double, 12, 12>::Zero();
@@ -277,6 +284,8 @@ void InsFilterNonHolonomic::setStateCovariance(MatrixXd F, MatrixXd U, MatrixXd 
     Q = G * U * G.transpose();
     this->state_covariance = F * this->state_covariance * F.transpose() + Q;
 }
+
+/* ***** PREDICT METHODS ***** */
 
 MatrixXd InsFilterNonHolonomic::measurementFcnKinematics()
 {
@@ -383,10 +392,11 @@ void InsFilterNonHolonomic::correctKinematics()
     innovation = tmp;
 }
 
-void InsFilterNonHolonomic::predict(Vector3f accel_data, Vector3f gyro_data)
+void InsFilterNonHolonomic::predict(Vector3d accel_data, Vector3d gyro_data)
 {
     /* Extended Kalman filter predict algorithm */
     this->setState(accel_data, gyro_data);
+
     MatrixXd F = this->stateTransitionJacobianFcn(accel_data, gyro_data);
     MatrixXd G = this->processNoiseJacobianFcn();
     MatrixXd U = this->processNoiseCovariance();
@@ -399,30 +409,333 @@ void InsFilterNonHolonomic::predict(Vector3f accel_data, Vector3f gyro_data)
     if(this->applyConstraintCount == this->decimation_factor)
     {
         this->correctKinematics();
-
         this->applyConstraintCount = 0;
     }
+
+    this->printCurrentState();
+
 }
 
-void InsFilterNonHolonomic::correct(
-    Vector3f lla_position,
-    Matrix3f position_covariance,
-    Vector3f velocity,
-    Matrix3f velocity_covariance, 
-    MatrixXf &out,
-    MatrixXf &residual_covariance)
+/* ***** END PREDICT METHODS ***** */
+
+/* ***** CORRECT METHODS ***** */
+
+Vector3d lla2ecef(Vector3d lla)
 {
-    ;
+    /* Semi-major axis (m) */
+    double a = 6378137.0;
+    /* Flattening */
+    double f = (1.0f / 298.257223563);
+
+    double phi = lla[0];
+    double lambda = lla[1];
+    double h = lla[2];
+
+    double sinphi = sind(phi);
+    double cosphi = cosd(phi);
+    double e2 = f * (2 - f);
+    double N  = a / sqrt(1 - e2 * pow(sinphi,2));
+    double rho = (N + h) * cosphi;
+    double z = (N*(1 - e2) + h) * sinphi;
+    double x = rho * cosd(lambda);
+    double y = rho * sind(lambda);
+
+    Vector3d ecefPos = Vector3d(x, y, z);
+    
+    return ecefPos;
 }
+
+Vector3d ecef2enu(Vector3d ecefPos, Vector3d lla)
+{
+    double phi = lla[0];
+    double lambda = lla[1];
+
+    double cosphi = cosd(phi);
+    double sinphi = sind(phi);
+    double coslambda = cosd(lambda);
+    double sinlambda = sind(lambda);
+
+    Vector3d ecef0 = lla2ecef(lla);
+
+    /* Computing the difference in the ECEF frame for now,
+     * oblateSpheroid/ecefOffset has a different algorithm that minimizes
+     * numerical round off.
+    */ 
+
+    Vector3d ecefPosWithENUOrigin = ecefPos - ecef0;
+    double x = ecefPosWithENUOrigin[0];
+    double y = ecefPosWithENUOrigin[1];
+    double z = ecefPosWithENUOrigin[2];
+
+    /* To rotate ECEF to ENU frame, use the transpose of the rotation matrix that
+    * rotates the ENU to ECEF frame (origin is the reference LLA coordinates).
+    * rotENU2ECEF = Rz(-(pi/2 + lambda)) * Ry(0) * Rx(-(pi/2 - phi))
+    * rotENU2ECEF = [-sinlambda -coslambda.*sinphi coslambda.*cosphi
+    *                 coslambda -sinlambda.*sinphi sinlambda.*cosphi
+    *                     0            cosphi            sinphi     ];
+    * rotECEF2ENU = rotENU2ECEF.';
+    * rotECEF2ENU = [     -sinlambda          coslambda      0
+    *                -coslambda.*sinphi -sinlambda.*sinphi cosphi
+    *                 coslambda.*cosphi  sinlambda.*cosphi sinphi];
+    */
+
+    double uEast = -sinlambda * x + coslambda * y;
+    double tmp = coslambda * x + sinlambda * y;
+    double vNorth = -sinphi * tmp + cosphi * z;
+    double wUp    =  cosphi * tmp + sinphi * z;
+
+    Vector3d enuPos = Vector3d(uEast, vNorth, wUp);
+
+    return enuPos;
+}
+
+MatrixXd InsFilterNonHolonomic::getPosInNEDFormat(Vector3d lla)
+{
+    /* Semi-major axis (m) */
+    double a = 6378137.0;
+    /* Flattening */
+    double f = (1.0f / 298.257223563);
+    double phi = lla[0];
+    double lambda = lla[1];
+    double h = lla[2];
+    double sinphi = sind(phi);
+    double cosphi = cosd(phi);
+    double e2 = f * (2 - f);
+    double N  = a / sqrt(1 - e2 * pow(sinphi,2));
+    double rho = (N + h) * cosphi;
+    double z = (N*(1 - e2) + h) * sinphi;
+    double x = rho * cosd(lambda);
+    double y = rho * sind(lambda);
+
+    Vector3d ecefPos = Vector3d(x, y, z);
+    Vector3d enuPos = ecef2enu(ecefPos, Vector3d(this->reference_location.latitude, this->reference_location.longitude, this->reference_location.altitude));
+
+    MatrixXd nedPos = Matrix<double, 3, 1>(enuPos[1], enuPos[0], enuPos[2]);
+
+    return nedPos;
+}
+
+void InsFilterNonHolonomic::velAndCovToCourseAndCov(
+    Vector2d vel, 
+    Matrix3d vel_r, 
+    double &course, 
+    double &courseR)
+{
+    double groundspeed = sqrt(pow(vel[0], 2) + pow(vel[1], 2));
+    double groundspeedR = 0.0; //norm(velR(1:2,1:2), 'fro');
+
+    courseR = groundspeedR / (pow(groundspeed,2));
+
+    /**
+     * Always use the y- and x-coordinate as inputs 1 and 2,
+     * respectively, since this will be compared against the current
+     * heading estimate, which is 0 whenever the body x-axis is
+     * aligned with the navigation x-axis.
+    */
+    course = atan2(vel[1], vel[0]);
+    if (course < 0)
+        course = course + 2*M_PI;
+
+}
+
+
+MatrixXd InsFilterNonHolonomic::measurementFcnGPS()
+{
+    MatrixXd h = Matrix<double, 4, 1>();
+
+    /* Retrieve actual filter state variables */
+    double q0 = this->filter_state(0, 0);
+    double q1 = this->filter_state(1, 0);
+    double q2 = this->filter_state(2, 0);
+    double q3 = this->filter_state(3, 0);
+    // double gbX = this->filter_state(4, 0);
+    // double gbY = this->filter_state(5, 0);
+    // double gbZ = this->filter_state(6, 0);
+    double pn = this->filter_state(7, 0);
+    double pe = this->filter_state(8, 0);
+    double pd = this->filter_state(9, 0);
+    // double vn = this->filter_state(10, 0);
+    // double ve = this->filter_state(11, 0);
+    // double vd = this->filter_state(12, 0);
+    // double abX = this->filter_state(13, 0);
+    // double abY = this->filter_state(14, 0);
+    // double abZ = this->filter_state(15, 0);
+
+    h(0,0) = pn;
+    h(1,0) = pe;
+    h(2,0) = pd;
+    h(3,0) = atan2((q0*q3*2 + q1*q2*2),(pow(q0,2)*2 - 1 + pow(q1,2)*2));
+
+    return h;
+}
+
+MatrixXd InsFilterNonHolonomic::measurementJacobianFcnGPS()
+{
+    MatrixXd H = Matrix<double, 4, 16>();
+    /* Retrieve actual filter state variables */
+    double q0 = this->filter_state(0, 0);
+    double q1 = this->filter_state(1, 0);
+    double q2 = this->filter_state(2, 0);
+    double q3 = this->filter_state(3, 0);
+    // double gbX = this->filter_state(4, 0);
+    // double gbY = this->filter_state(5, 0);
+    // double gbZ = this->filter_state(6, 0);
+    // double pn = this->filter_state(7, 0);
+    // double pe = this->filter_state(8, 0);
+    // double pd = this->filter_state(9, 0);
+    // double vn = this->filter_state(10, 0);
+    // double ve = this->filter_state(11, 0);
+    // double vd = this->filter_state(12, 0);
+    // double abX = this->filter_state(13, 0);
+    // double abY = this->filter_state(14, 0);
+    // double abZ = this->filter_state(15, 0);
+
+    H(0, 0) = 0;
+    H(0, 1) = 0;
+    H(0, 2) = 0;
+    H(0, 3) = 0;
+    H(0, 4) = 0;
+    H(0, 5) = 0;
+    H(0, 6) = 0;
+    H(0, 7) = 1;
+    H(0, 8) = 0;
+    H(0, 9) = 0;
+    H(0, 10) = 0;
+    H(0, 11) = 0;
+    H(0, 12) = 0;
+    H(0, 13) = 0;
+    H(0, 14) = 0;
+    H(0, 15) = 0;
+
+    H(1, 0) = 0;
+    H(1, 1) = 0;
+    H(1, 2) = 0;
+    H(1, 3) = 0;
+    H(1, 4) = 0;
+    H(1, 5) = 0;
+    H(1, 6) = 0;
+    H(1, 7) = 0;
+    H(1, 8) = 1;
+    H(1, 9) = 0;
+    H(1, 10) = 0; 
+    H(1, 11) = 0; 
+    H(1, 12) = 0; 
+    H(1, 13) = 0; 
+    H(1, 14) = 0; 
+    H(1, 15) = 0;
+
+    H(2, 0) = 0;
+    H(2, 1) = 0;
+    H(2, 2) = 0;
+    H(2, 3) = 0;
+    H(2, 4) = 0;
+    H(2, 5) = 0;
+    H(2, 6) = 0;
+    H(2, 7) = 0;
+    H(2, 8) = 0;
+    H(2, 9) = 1;
+    H(2, 10) = 0; 
+    H(2, 11) = 0; 
+    H(2, 12) = 0; 
+    H(2, 13) = 0; 
+    H(2, 14) = 0; 
+    H(2, 15) = 0; 
+
+    H(3, 0) = (((2*q3)/(2*pow(q0,2) + 2*pow(q1,2) - 1) - (4*q0*(2*q0*q3 + 2*q1*q2))/pow((2*pow(q0,2) + 2*pow(q1,2) - 1),2))*pow((2*pow(q0,2) + 2*pow(q1,2) - 1),2))/(pow((2*pow(q0,2) + 2*pow(q1,2) - 1),2) + pow((2*q0*q3 + 2*q1*q2),2));
+    H(3, 1) = (((2*q2)/(2*pow(q0,2) + 2*pow(q1,2) - 1) - (4*q1*(2*q0*q3 + 2*q1*q2))/pow((2*pow(q0,2) + 2*pow(q1,2) - 1),2))*pow((2*pow(q0,2) + 2*pow(q1,2) - 1),2))/(pow((2*pow(q0,2) + 2*pow(q1,2) - 1),2) + pow((2*q0*q3 + 2*q1*q2),2));
+    H(3, 2) = (2*q1*(2*pow(q0,2) + 2*pow(q1,2) - 1))/(pow((2*pow(q0,2) + 2*pow(q1,2) - 1),2) + pow((2*q0*q3 + 2*q1*q2),2));
+    H(3, 3) = (2*q0*(2*pow(q0,2) + 2*pow(q1,2) - 1))/(pow((2*pow(q0,2) + 2*pow(q1,2) - 1),2) + pow((2*q0*q3 + 2*q1*q2),2));
+    H(3, 4) = 0;
+    H(3, 5) = 0;
+    H(3, 6) = 0;
+    H(3, 7) = 0;
+    H(3, 8) = 0;
+    H(3, 9) = 0;
+    H(3, 10) = 0;
+    H(3, 11) = 0;
+    H(3, 12) = 0;
+    H(3, 13) = 0;
+    H(3, 14) = 0;
+    H(3, 15) = 0;
+
+    return H;
+
+}
+
+void InsFilterNonHolonomic::correctEqn(MatrixXd h,
+    MatrixXd H,
+    MatrixXd z,
+    Matrix4d R
+)
+{
+    MatrixXd innovation_covariance = H * this->state_covariance * H.transpose() + R;
+    MatrixXd innovation = z - h;
+    MatrixXd W = Matrix<double, 16, 2>();
+
+    W = this->state_covariance * H.transpose();
+
+    /* Matrix division */
+    // W = innovation_covariance.transpose().colPivHouseholderQr().solve(W.transpose()).transpose();  
+    W = W*innovation_covariance.inverse();
+
+    this->filter_state = this->filter_state + W * innovation;
+    this->state_covariance = this->state_covariance - W * H * this->state_covariance;
+
+    InsFilterNonHolonomicTypes::Quaternion::repair({
+        this->filter_state(0, 0),
+        this->filter_state(1, 0),
+        this->filter_state(2, 0),
+        this->filter_state(3, 0)
+    });
+    MatrixXd tmp = innovation.transpose();
+    innovation = tmp;
+
+}
+
+void InsFilterNonHolonomic::fusegps(Vector3d lla_position, Vector3d velocity)
+{
+    Matrix3d pos_covariance = Matrix<double, 3,3>::Identity() * this->r_pos;
+    Matrix3d vel_covariance = Matrix<double, 3,3>::Identity() * this->r_vel;
+
+    MatrixXd h = this->measurementFcnGPS();
+    MatrixXd H = this->measurementJacobianFcnGPS();
+
+    double course, course_r;
+
+    std::cerr << "Vel Vx: " << velocity[0] << " Vy: " << velocity[1] << "\n";
+
+    this->velAndCovToCourseAndCov(Vector2d(velocity[0], velocity[1]), vel_covariance, course, course_r);
+
+    /**
+     * Adjust measured course so that the magnitude of the 
+     * difference between it and the estimated course is less than
+     * or equal to 180 degrees
+    */
+    double courseDiff = course - h(3,0);
+    if (courseDiff > M_PI)
+        course = course - (2*M_PI);
+
+    MatrixXd pos = this->getPosInNEDFormat(lla_position);
+    
+    MatrixXd z = Matrix<double, 4, 1>(pos(0,0), pos(1,0), pos(2,0), course);
+
+    Matrix4d R = Matrix4d::Identity() * this->r_pos;
+    R(3,3) = course_r;
+
+    /* Updated filter state and state covariance */
+    this->correctEqn(h, H, z, R);
+}
+
+/* ***** END CORRECT METHODS ***** */
 
 void InsFilterNonHolonomic::pose(Vector3d &curr_position, Vector4d &curr_orientation, 
     Vector3d &curr_velocity)
 {
-    /* Set actual position */
-    curr_position = Vector3d(this->filter_state(7,0),this->filter_state(8,0), this->filter_state(9,0));
-
     /* Set actual orientation */
     curr_orientation = Vector4d(this->filter_state(0,0), this->filter_state(1,0),this->filter_state(2,0), this->filter_state(3,0));
+
+    /* Set actual position */
+    curr_position = Vector3d(this->filter_state(7,0),this->filter_state(8,0), this->filter_state(9,0));
 
     /* Set actual velocities */
     curr_velocity = Vector3d(this->filter_state(10,0),this->filter_state(11,0), this->filter_state(12,0));
@@ -438,6 +751,7 @@ void InsFilterNonHolonomic::printFilterConstraints()
     std::cout << "accel_bias_decay_factor: " << this->accel_bias_decay_factor << "\n";
     std::cout << "r_vel: " << this->r_vel << "\n";
     std::cout << "r_pos: " << this->r_pos << "\n";
+    std::cout << "zero_velocity_constraint_noise: " << this->zero_velocity_constraint_noise << "\n";
 }
 
 void InsFilterNonHolonomic::printCurrentState()

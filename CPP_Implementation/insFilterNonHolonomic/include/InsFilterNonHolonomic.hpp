@@ -8,6 +8,8 @@
 #include <Eigen/Dense>
 #include <iostream>
 
+#define sind(x) (sin(fmod((x),360) * M_PI / 180))
+#define cosd(x) (cos(fmod((x),360) * M_PI / 180))
 
 using namespace Eigen;
 using Eigen::MatrixXd;
@@ -23,7 +25,7 @@ private:
     gps_fix_t reference_location;
 
     /* Decimation Factor used for applying kinematics constraints */
-    uint8_t decimation_factor = 1;
+    uint8_t decimation_factor = 2;
     uint8_t applyConstraintCount = 0;
 
 
@@ -38,14 +40,14 @@ private:
     MatrixXd state_covariance;
 
     /* Define sensors noise */
-    Vector3f gyroscope_noise;                   /* Gyro noise */
-    Vector3f gyroscope_bias_noise;              /* Gyro bias noise */
-    float gyroscope_bias_decay_factor;          /* A decay factor of 0 models gyroscope bias as a white noise process. A decay factor of 1 models the gyroscope bias as a random walk process */
-    Vector3f accelerometer_noise;               /* Accel noise */
-    Vector3f accelerometer_bias_noise;          /* Accel bias noise */
-    float accel_bias_decay_factor;              /* A decay factor of 0 models gyroscope bias as a white noise process. A decay factor of 1 models the gyroscope bias as a random walk process */
-    float r_vel = 0.0f;                         /* Noise of measured velocity */
-    float r_pos = 0.005f;                       /* Noise of measured position */
+    Vector3d gyroscope_noise;                   /* Gyro noise */
+    Vector3d gyroscope_bias_noise;              /* Gyro bias noise */
+    double gyroscope_bias_decay_factor;          /* A decay factor of 0 models gyroscope bias as a white noise process. A decay factor of 1 models the gyroscope bias as a random walk process */
+    Vector3d accelerometer_noise;               /* Accel noise */
+    Vector3d accelerometer_bias_noise;          /* Accel bias noise */
+    double accel_bias_decay_factor;              /* A decay factor of 0 models gyroscope bias as a white noise process. A decay factor of 1 models the gyroscope bias as a random walk process */
+    double r_vel = 0.0f;                         /* Noise of measured velocity */
+    double r_pos = 0.005f;                       /* Noise of measured position */
 
     /**
      * The dynamic model of the ground vehicle for this filter assumes there is
@@ -54,7 +56,7 @@ private:
      * readings are corrected with a zero measurement weighted by the 
      * |zero_velocity_constraint_noise| parameter.
     */ 
-    float zero_velocity_constraint_noise = 1e-3;/* Velocity constraints noise in (m/s)^2 */
+    double zero_velocity_constraint_noise = 1e-3;/* Velocity constraints noise in (m/s)^2 */
 
     /* TODO: SPECIFY PARAMETERS IN A .yaml FILE. And check that you read that correctly */
 
@@ -64,7 +66,7 @@ private:
      * @param[in] accel_data system accelerations around X,Y and Z axis in m/s^2
      * @param[in] gyro_data system accelerations around X,Y and Z axis in rad/s
     */
-    void setState(Vector3f accel_data, Vector3f gyro_data);
+    void setState(Vector3d accel_data, Vector3d gyro_data);
 
     /**
      * Jacobian of process equations. Compute the Jacobian matrix F 
@@ -73,7 +75,7 @@ private:
      * @param[in] accel_data system accelerations around X,Y and Z axis in m/s^2
      * @param[in] gyro_data system accelerations around X,Y and Z axis in rad/s
     */
-    MatrixXd stateTransitionJacobianFcn(Vector3f accel_data, Vector3f gyro_data);
+    MatrixXd stateTransitionJacobianFcn(Vector3d accel_data, Vector3d gyro_data);
 
     /**
      * Compute jacobian for multiplicative process noise
@@ -122,16 +124,18 @@ public:
      * @param[in,optional] r_pos Noise of measured position
      * @param[in,optional] gyroscope_bias_decay_factor Gyroscope bias noise decay factor
      * @param[in,optional] accel_bias_decay_factor Accelerometer bias noise decay factor
+     * @param[in,optional] zero_velocity_constraint_noise Noise for side slip
      * 
     */
-    void loadParameters(Vector3f gyroscope_noise,
-        Vector3f gyroscope_bias_noise,
-        Vector3f accelerometer_noise,
-        Vector3f accelerometer_bias_noise,
-        float r_vel,
-        float r_pos,
-        float gyroscope_bias_decay_factor,
-        float accel_bias_decay_factor
+    void loadParameters(Vector3d gyroscope_noise,
+        Vector3d gyroscope_bias_noise,
+        Vector3d accelerometer_noise,
+        Vector3d accelerometer_bias_noise,
+        double r_vel,
+        double r_pos,
+        double gyroscope_bias_decay_factor,
+        double accel_bias_decay_factor,
+        double zero_velocity_constraint_noise
     );
 
 
@@ -144,6 +148,11 @@ public:
         Vector3d position_init, 
         Vector3d velocity_init, 
         Vector3d accel_bias_init);
+
+    /**
+     * Set reference location of the filter
+    */
+   void setRefLocation(double latitude, double longitude, double altitude);
 
     /**
      * Print filter constraints
@@ -166,21 +175,51 @@ public:
      * @param[in] accel_data system accelerations around X,Y and Z axis in m/s^2
      * @param[in] gyro_data system accelerations around X,Y and Z axis in rad/s
     */
-    void predict(Vector3f accel_data, Vector3f gyro_data);
+    void predict(Vector3d accel_data, Vector3d gyro_data);
+
+    /**
+     * Get position in NED format
+     * @param[in] lla new Latitude Longitude and Altitude
+    */
+    MatrixXd getPosInNEDFormat(Vector3d lla);
+
+    /**
+     * Measure course and course covariance
+     * @param[in] vel Vx and Vy velocities
+     * @param[in] vel_r Velocities noise
+     * @param[out] course Calculated course
+     * @param[out] couseR Calculated course noise
+    */
+    void velAndCovToCourseAndCov(Vector2d vel, Matrix3d vel_r, double &course, double &courseR);
+
+    /**
+     * Measurement function h(x) for filter state vector 
+     * 4 measurements from GPS [posN, posE, posD, heading];
+    */
+    MatrixXd measurementFcnGPS();
+
+    /**
+     * Compute the jacobian H of measurement function h(x)
+    */
+    MatrixXd measurementJacobianFcnGPS();
+
+    /**
+     * 
+    */
+    void correctEqn(MatrixXd h,
+        MatrixXd H,
+        MatrixXd z,
+        Matrix4d R
+    );
 
 
     /**
-     * Correct filter state using GPS data.
+     * correct filter state using GPS data.
      * 
      * @param[in] lla_position Position of GPS receiver in geodetic latitude, longitude, and altitude (LLA) format. Latitude and longitude are in degrees with north and east being positive. Altitude is in meters.
-     * @param[in] position_covariance Position measurement covariance of GPS receiver in m^2.
      * @param[in] velocity Velocity of the GPS receiver in the local NED coordinate system in m/s
-     * @param[in] velocity_covariance measurement covariance of the GPS receiver in the local NED coordinate system in (m/s)^2
-     * @param[out] out Position and course residual, returned as a 1-by-6 vector of real values in m and rad/s, respectively.
-     * @param[out] residual_covariance Residual covariance
     */
-    void correct(Vector3f lla_position, Matrix3f position_covariance, Vector3f velocity, Matrix3f velocity_covariance, 
-        MatrixXf &out, MatrixXf &residual_covariance);
+    void fusegps(Vector3d lla_position, Vector3d velocity);
 
     /**
      * Return current system position, orientation and velocity
