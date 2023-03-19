@@ -9,6 +9,7 @@
 #include "geometry_msgs/msg/transform_stamped.hpp"
 #include "tf2/LinearMath/Quaternion.h"
 #include "tf2_ros/transform_broadcaster.h"
+#include <nav_msgs/msg/odometry.hpp>
 
 #include <InsFilterNonHolonomic.hpp>
 
@@ -22,6 +23,7 @@ class GpsImuFusion : public rclcpp::Node
 private:
     /* Bool to check if filter is initialized */
     bool is_filter_initialized = false;
+    bool is_ref_location_set = false;
 
     /* Sensors Frequency (Hz) */
     uint8_t imu_fs, gps_fs;
@@ -35,11 +37,14 @@ private:
     double r_pos = 0.005f;
     double gyroscope_bias_decay_factor = 1.0f;
     double accel_bias_decay_factor = 1.0f;
+    double zero_velocity_constraint_noise = 1e-3;
 
     /**
      * TODO: Create log files
      */
-    uint8_t count_imu_topics = 0;
+    uint16_t count_imu_topics = 0;
+    uint16_t count_gps_topics = 0;
+    Vector3d prev_loc;
     ofstream predictFile;
     double vx = 0;
     double vy = 0;
@@ -59,6 +64,9 @@ private:
 
     /* TF2 broadcaster */
     std::unique_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster_;
+
+    /* Odometry publisher */
+    rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr odom_pub;
 
     /**
      * Load ROS 2 parameters function

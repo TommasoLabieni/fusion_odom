@@ -23,6 +23,7 @@ find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
+find_package(nav_msgs REQUIRED)
 find_package(tf2_ros REQUIRED)
 
 # find include directories
@@ -39,6 +40,7 @@ ament_target_dependencies(${PROJECT_NAME}_class
   sensor_msgs
   geometry_msgs
   tf2_ros
+  nav_msgs
 )
 
 target_link_libraries(${PROJECT_NAME}_class
