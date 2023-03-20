@@ -25,7 +25,7 @@ private:
     gps_fix_t reference_location;
 
     /* Decimation Factor used for applying kinematics constraints */
-    uint8_t decimation_factor = 2;
+    uint8_t decimation_factor = 1;
     uint8_t applyConstraintCount = 0;
 
 

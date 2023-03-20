@@ -22,7 +22,8 @@ class GpsImuFusion : public rclcpp::Node
 {
 private:
     /* Bool to check if filter is initialized */
-    bool is_filter_initialized = false;
+    bool is_filter_orientation_initialized = false;
+    bool is_filter_location_initialized = false;
     bool is_ref_location_set = false;
 
     /* Sensors Frequency (Hz) */
@@ -44,6 +45,7 @@ private:
      */
     uint16_t count_imu_topics = 0;
     uint16_t count_gps_topics = 0;
+    uint16_t count_total_topic = 0;
     Vector3d prev_loc;
     ofstream predictFile;
     double vx = 0;

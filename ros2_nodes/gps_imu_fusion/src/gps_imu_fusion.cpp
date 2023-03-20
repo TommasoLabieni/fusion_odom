@@ -7,10 +7,10 @@ GpsImuFusion::GpsImuFusion() : rclcpp::Node("gps_imu_fusion_node")
 
     /* Create subscribers */
     this->imu_sub = this->create_subscription<sensor_msgs::msg::Imu>(
-        this->imu_topic, 10, std::bind(&GpsImuFusion::imuDataCallback, this, std::placeholders::_1));
+        this->imu_topic, 1, std::bind(&GpsImuFusion::imuDataCallback, this, std::placeholders::_1));
 
     this->gps_sub = this->create_subscription<sensor_msgs::msg::NavSatFix>(
-        this->gps_topic, 10, std::bind(&GpsImuFusion::gpsDataCallback, this, std::placeholders::_1));
+        this->gps_topic, 1, std::bind(&GpsImuFusion::gpsDataCallback, this, std::placeholders::_1));
 
     /* Create EKF Filter */
     this->gndFusion = new InsFilterNonHolonomic();
@@ -29,7 +29,7 @@ GpsImuFusion::GpsImuFusion() : rclcpp::Node("gps_imu_fusion_node")
     RCLCPP_INFO(this->get_logger(), "Initial constraints: \n");
     this->gndFusion->printFilterConstraints();
 
-    this->predictFile.open("/tmp/predict_data.txt");
+    this->predictFile.open("/tmp/predict_data.txt",std::ios_base::app);
 
     /* Initialize the transform broadcaster */
     this->tf_broadcaster_ = std::make_unique<tf2_ros::TransformBroadcaster>(*this);
@@ -81,8 +81,7 @@ void GpsImuFusion::loadParameters()
 
 void GpsImuFusion::imuDataCallback(const sensor_msgs::msg::Imu::SharedPtr imu_data)
 {
-    if (this->count_imu_topics == 10)
-        return;
+    this->count_total_topic++;
     rclcpp::Time start, end;
     start = this->now();
 
@@ -91,18 +90,22 @@ void GpsImuFusion::imuDataCallback(const sensor_msgs::msg::Imu::SharedPtr imu_da
     double qz = imu_data->orientation.z;
     double qw = imu_data->orientation.w;
 
-    if (!this->is_filter_initialized)
+    if (!this->is_filter_orientation_initialized)
     {
         this->gndFusion->setInitState(
             Vector4d(qw, qx, qy, qz), /* Initial Quaternion */
-            Vector3d::Zero(),//(0.000265955156806132, 0.000118613066929290, -0.000865860620781665),
+            Vector3d(-3.05745876411404e-06, 1.44325973037567e-06, 5.61037701246807e-05),
             Vector3d::Zero(),
             Vector3d::Zero(),
-            Vector3d::Zero());//(9.42558485122576e-05, -2.35931658257626e-05, 0.000160709506499922));
-        this->is_filter_initialized = true;
+            Vector3d(-7.88350054851016e-06, -1.93254742380793e-07, 3.23255528039867e-06));
+        this->is_filter_orientation_initialized = true;
+        this->gndFusion->printCurrentState();
         RCLCPP_INFO(this->get_logger(), "Inital state covariance:");
         // this->gndFusion->printCurrentStateCovariance();
     }
+
+    if (!this->is_filter_location_initialized)
+        return;
 
     /* Convert IMU accel_data to eigen vector */
     Vector3d accel_data(imu_data->linear_acceleration.x, imu_data->linear_acceleration.y, imu_data->linear_acceleration.z);
@@ -120,17 +123,17 @@ void GpsImuFusion::imuDataCallback(const sensor_msgs::msg::Imu::SharedPtr imu_da
 
     Vector3d gyro_data(imu_data->angular_velocity.x, imu_data->angular_velocity.y, imu_data->angular_velocity.z);
 
-    RCLCPP_INFO(this->get_logger(), "PREDICTING NEW SYSTEM STATE");
-    std::cerr << "accel_data: " << accel_data << "\n";
-    std::cerr << "gyro_data: " << gyro_data << "\n";
+    // RCLCPP_INFO(this->get_logger(), "PREDICTING NEW SYSTEM STATE");
+    // std::cerr << "accel_data: " << accel_data << "\n";
+    // std::cerr << "gyro_data: " << gyro_data << "\n";
     /* Predict */
     this->gndFusion->predict(accel_data, gyro_data);
     end = this->now();
     rclcpp::Duration exe_time = end - start;
 
-    RCLCPP_INFO(this->get_logger(), "Predict exe time (ms): %f", (float)exe_time.nanoseconds() / 1e6);
+    // RCLCPP_INFO(this->get_logger(), "Predict exe time (ms): %f", (float)exe_time.nanoseconds() / 1e6);
 
-    RCLCPP_INFO(this->get_logger(), "Current filter state AFTER PREDICTION:");
+    // RCLCPP_INFO(this->get_logger(), "Current filter state AFTER PREDICTION:");
     // this->gndFusion->printCurrentState();
 
     Vector4d act_orientation;
@@ -141,25 +144,23 @@ void GpsImuFusion::imuDataCallback(const sensor_msgs::msg::Imu::SharedPtr imu_da
 
     this->count_imu_topics++;
 
-    if (this->count_imu_topics <= 6000)
+    if (this->count_total_topic <= 6300)
     {
-        // Write to the file
-        this->predictFile << "ITER [" << (count_imu_topics + "") << "]: "
-                          << "\n"
-                          << "qw: " << act_orientation[0] << "\n"
-                          << "qx: " << act_orientation[1] << "\n"
-                          << "qy: " << act_orientation[2] << "\n"
-                          << "qz: " << act_orientation[3] << "\n"
-                          << "pn: " << act_postion[0] << "\n"
-                          << "pe: " << act_postion[1] << "\n"
-                          << "pd: " << act_postion[2] << "\n";
-    }
-    else
+        ;
+        // // Write to the file
+        // this->predictFile << "ITER [" << (count_imu_topics) << "]: "
+        //                   << "\n"
+        //                   << "qw: " << act_orientation[0] << "\n"
+        //                   << "qx: " << act_orientation[1] << "\n"
+        //                   << "qy: " << act_orientation[2] << "\n"
+        //                   << "qz: " << act_orientation[3] << "\n"
+        //                   << "pn: " << act_postion[0] << "\n"
+        //                   << "pe: " << act_postion[1] << "\n"
+        //                   << "pd: " << act_postion[2] << "\n";
+    } else
     {
-        // Close the file
-        predictFile.close();
+        this->predictFile.close();
     }
-
     /* Update vehicle TF */
     geometry_msgs::msg::Quaternion q;
     q.w = act_orientation[0];
@@ -169,26 +170,27 @@ void GpsImuFusion::imuDataCallback(const sensor_msgs::msg::Imu::SharedPtr imu_da
     this->updateTf(act_postion, q);
 }
 
-Vector3d measure_distance(double lat1, double lon1, double alt1, double lat2, double lon2, double alt2, double time)
-{
-    Vector3d velocities;
-    double dLat = lat2 * M_PI / 180.0 - lat1 * M_PI / 180.0;
-    double dLon = lon2 * M_PI / 180.0 - lon1 * M_PI / 180.0;
-    std::cerr << "dLat: " << dLat << "\n";
-    std::cerr << "dLon: " << dLon << "\n";
-    double latVelocity = dLat * time;
-    double lngVelocity = dLon * time;
-    std::cerr << "latVel: " << latVelocity << "\n";
-    std::cerr << "lngVel: " << lngVelocity << "\n";
-    double altVelocity = (alt2 - alt1) * time;
-    velocities << latVelocity, lngVelocity, altVelocity;
+// Vector3d measure_distance(double lat1, double lon1, double alt1, double lat2, double lon2, double alt2, double time)
+// {
+//     Vector3d velocities;
+//     double dLat = lat2 * M_PI / 180.0 - lat1 * M_PI / 180.0;
+//     double dLon = lon2 * M_PI / 180.0 - lon1 * M_PI / 180.0;
+//     std::cerr << "dLat: " << dLat << "\n";
+//     std::cerr << "dLon: " << dLon << "\n";
+//     double latVelocity = dLat * time;
+//     double lngVelocity = dLon * time;
+//     std::cerr << "latVel: " << latVelocity << "\n";
+//     std::cerr << "lngVel: " << lngVelocity << "\n";
+//     double altVelocity = (alt2 - alt1) * time;
+//     velocities << latVelocity, lngVelocity, altVelocity;
 
-    return velocities;
-}
+//     return velocities;
+// }
 
 void GpsImuFusion::gpsDataCallback(const sensor_msgs::msg::NavSatFix::SharedPtr gps_data)
 {
-    this->count_imu_topics = 0;
+    this->count_total_topic++;
+    count_imu_topics = 0;
     rclcpp::Time start, end;
     start = this->now();
 
@@ -200,32 +202,42 @@ void GpsImuFusion::gpsDataCallback(const sensor_msgs::msg::NavSatFix::SharedPtr 
     Vector3d velocities;
 
     /* Check if this is the first Navsat msg */
-    if (!is_ref_location_set)
+    if (!is_filter_location_initialized)
     {
         /* In that case, set reference location */
         this->gndFusion->setRefLocation(latitude, longitude, altitude);
-        this->is_ref_location_set = true;
-    }
+        this->is_filter_location_initialized = true;
+        velocities << 3.29344e-08, 3.09796e-08, 0;
+    } else {
+        /*
 
-    /* If no IMU data, skip to next iteration */
-    if (this->count_imu_topics == 0)
-        return;
-
-    RCLCPP_INFO(this->get_logger(), "FUSING GP DATA");
-
-    if (count_gps_topics == 0)
-        velocities << 0.1, 0.1, 0;
-    else
-    {
         double dLat = latitude * M_PI / 180.0 - prev_loc[0] * M_PI / 180.0;
         double dLon = longitude * M_PI / 180.0 - prev_loc[1] * M_PI / 180.0;
         double latVelocity = dLat * 0.1 * 1000000;
         double lngVelocity = dLon * 0.1 * 100000;
         double altVelocity = (altitude - prev_loc[2]) * 0.1;
-        velocities << latVelocity, lngVelocity, altVelocity;
+        */
+        double time = 1.0 / this->gps_fs;
+        double R = 6378.137; 
+        double dLat = latitude * M_PI / 180.0 - prev_loc[0] * M_PI / 180.0;
+        double dLon = longitude * M_PI / 180.0 - prev_loc[1] * M_PI / 180.0;
+        double a = sin(dLat/2.0) * sin(dLat/2.0) + cos(prev_loc[0] * M_PI / 180) * cos(latitude * M_PI / 180.0) * sin(dLon/2.0) * sin(dLon/2.0);
+        double c = 2.0 * atan2(sqrt(a), sqrt(1.0-a));
+        double d = R * c;
+        d *= 1000.0; 
+        double latVelocity = d * time;
+        double lngVelocity = d * time;
+        velocities << dLat, dLon, 0.0;
+        std::cerr << "Vx : " << velocities[0] << " Vy: " << velocities[1] << "\n";
         // velocities = measure_distance(prev_loc[0], prev_loc[1], prev_loc[2], latitude, longitude, altitude, 0.1);
     }
 
+
+    if (!this->is_filter_orientation_initialized)
+        return;
+    RCLCPP_INFO(this->get_logger(), "FUSING GP DATA");
+
+    /* Update previous location */
     prev_loc = Vector3d(latitude, longitude, altitude);
 
     this->gndFusion->fusegps(lla, velocities);
@@ -246,24 +258,19 @@ void GpsImuFusion::gpsDataCallback(const sensor_msgs::msg::NavSatFix::SharedPtr 
 
     count_gps_topics++;
 
-    if (this->count_gps_topics <= 600)
-    {
-        // Write to the file
-        this->predictFile << "ITER_GPS [" << (count_gps_topics + "") << "]: "
-                          << "\n"
-                          << "qw: " << act_orientation[0] << "\n"
-                          << "qx: " << act_orientation[1] << "\n"
-                          << "qy: " << act_orientation[2] << "\n"
-                          << "qz: " << act_orientation[3] << "\n"
-                          << "pn: " << act_postion[0] << "\n"
-                          << "pe: " << act_postion[1] << "\n"
-                          << "pd: " << act_postion[2] << "\n";
-    }
-    else
-    {
-        // Close the file
-        predictFile.close();
-    }
+    // if (this->count_total_topic <= 6300)
+    // {
+    //     // Write to the file
+    //     this->predictFile << "ITER_GPS [" << (count_gps_topics) << "]: "
+    //                       << "\n"
+    //                       << "qw: " << act_orientation[0] << "\n"
+    //                       << "qx: " << act_orientation[1] << "\n"
+    //                       << "qy: " << act_orientation[2] << "\n"
+    //                       << "qz: " << act_orientation[3] << "\n"
+    //                       << "pn: " << act_postion[0] << "\n"
+    //                       << "pe: " << act_postion[1] << "\n"
+    //                       << "pd: " << act_postion[2] << "\n";
+    // }
 }
 
 /* ***** END CALLBACKS ***** */

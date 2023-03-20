@@ -95,7 +95,7 @@ void InsFilterNonHolonomic::setState(Vector3d accel_data, Vector3d gyro_data)
     double gmY = gyro_data(1);
     double gmZ = gyro_data(2);
 
-    double dt = 1.0f / this->imu_fs;
+    double dt = (double)1.0 / this->imu_fs;
 
     double lambda_gyro = 1 - this->gyroscope_bias_decay_factor;
     double lambda_accel = 1 - this->accel_bias_decay_factor;
@@ -132,14 +132,25 @@ void InsFilterNonHolonomic::setState(Vector3d accel_data, Vector3d gyro_data)
     this->filter_state(13, 0) = -abX*(dt*lambda_accel - 1);  //accel_bias_x
     this->filter_state(14, 0) = -abY*(dt*lambda_accel - 1);  //accel_bias_y
     this->filter_state(15, 0) = -abZ*(dt*lambda_accel - 1);  //accel_bias_z
+    // InsFilterNonHolonomicTypes::Quaternion::repair({
+    //     this->filter_state(0, 0),
+    //     this->filter_state(1, 0),
+    //     this->filter_state(2, 0),
+    //     this->filter_state(3, 0)
+    // });
+    double n = sqrt(pow(this->filter_state(0, 0), 2) + pow(this->filter_state(1, 0), 2) + pow(this->filter_state(2, 0), 2) + pow(this->filter_state(3, 0), 2));
+    this->filter_state(0, 0) /= n;
+    this->filter_state(1, 0) /= n; 
+    this->filter_state(2, 0) /= n;
+    this->filter_state(3, 0) /= n;
 
-    InsFilterNonHolonomicTypes::Quaternion::repair({
-        this->filter_state(0, 0),
-        this->filter_state(1, 0),
-        this->filter_state(2, 0),
-        this->filter_state(3, 0)
-    });
-
+    if (this->filter_state(0, 0) < 0)
+    {
+        this->filter_state(0, 0) *= -1;
+        this->filter_state(1, 0) *= -1; 
+        this->filter_state(2, 0) *= -1;
+        this->filter_state(3, 0) *= -1;
+    }
 }
 
 MatrixXd InsFilterNonHolonomic::stateTransitionJacobianFcn(Vector3d accel_data, Vector3d gyro_data)
@@ -382,12 +393,26 @@ void InsFilterNonHolonomic::correctKinematics()
 
     this->filter_state = this->filter_state + W * innovation;
     this->state_covariance = this->state_covariance - W * H * this->state_covariance;
-    InsFilterNonHolonomicTypes::Quaternion::repair({
-        this->filter_state(0, 0),
-        this->filter_state(1, 0),
-        this->filter_state(2, 0),
-        this->filter_state(3, 0)
-    });
+    // InsFilterNonHolonomicTypes::Quaternion::repair({
+    //     this->filter_state(0, 0),
+    //     this->filter_state(1, 0),
+    //     this->filter_state(2, 0),
+    //     this->filter_state(3, 0)
+    // });
+    double n = sqrt(pow(this->filter_state(0, 0), 2) + pow(this->filter_state(1, 0), 2) + pow(this->filter_state(2, 0), 2) + pow(this->filter_state(3, 0), 2));
+    this->filter_state(0, 0) /= n;
+    this->filter_state(1, 0) /= n; 
+    this->filter_state(2, 0) /= n;
+    this->filter_state(3, 0) /= n;
+
+    if (this->filter_state(0, 0) < 0)
+    {
+        this->filter_state(0, 0) *= -1;
+        this->filter_state(1, 0) *= -1; 
+        this->filter_state(2, 0) *= -1;
+        this->filter_state(3, 0) *= -1;
+    }
+
     MatrixXd tmp = innovation.transpose();
     innovation = tmp;
 }
@@ -412,7 +437,7 @@ void InsFilterNonHolonomic::predict(Vector3d accel_data, Vector3d gyro_data)
         this->applyConstraintCount = 0;
     }
 
-    this->printCurrentState();
+    // this->printCurrentState();
 
 }
 
@@ -701,8 +726,6 @@ void InsFilterNonHolonomic::fusegps(Vector3d lla_position, Vector3d velocity)
     MatrixXd H = this->measurementJacobianFcnGPS();
 
     double course, course_r;
-
-    std::cerr << "Vel Vx: " << velocity[0] << " Vy: " << velocity[1] << "\n";
 
     this->velAndCovToCourseAndCov(Vector2d(velocity[0], velocity[1]), vel_covariance, course, course_r);
 
