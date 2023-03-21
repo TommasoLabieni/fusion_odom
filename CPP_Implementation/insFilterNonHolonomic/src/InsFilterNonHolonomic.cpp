@@ -758,7 +758,7 @@ void InsFilterNonHolonomic::pose(Vector3d &curr_position, Vector4d &curr_orienta
     curr_orientation = Vector4d(this->filter_state(0,0), this->filter_state(1,0),this->filter_state(2,0), this->filter_state(3,0));
 
     /* Set actual position */
-    curr_position = Vector3d(this->filter_state(7,0),this->filter_state(8,0), this->filter_state(9,0));
+    curr_position = Vector3d(this->filter_state(7,0),-this->filter_state(8,0), this->filter_state(9,0));
 
     /* Set actual velocities */
     curr_velocity = Vector3d(this->filter_state(10,0),this->filter_state(11,0), this->filter_state(12,0));

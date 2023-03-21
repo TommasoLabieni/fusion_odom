@@ -9,6 +9,7 @@
 #include "geometry_msgs/msg/transform_stamped.hpp"
 #include "tf2/LinearMath/Quaternion.h"
 #include "tf2_ros/transform_broadcaster.h"
+#include <tf2/LinearMath/Matrix3x3.h>
 #include <nav_msgs/msg/odometry.hpp>
 
 #include <InsFilterNonHolonomic.hpp>
@@ -91,7 +92,7 @@ private:
      * @param[in] p Vehicle position
      * @param[in] q Vehicle orientation
     */
-    void updateTf(Vector3d p, geometry_msgs::msg::Quaternion q);
+    void updateTf(Vector3d p, tf2::Quaternion q);
 
 public:
     /* Default constructor */

@@ -162,11 +162,18 @@ void GpsImuFusion::imuDataCallback(const sensor_msgs::msg::Imu::SharedPtr imu_da
         this->predictFile.close();
     }
     /* Update vehicle TF */
-    geometry_msgs::msg::Quaternion q;
-    q.w = act_orientation[0];
-    q.x = act_orientation[1];
-    q.y = act_orientation[2];
-    q.z = act_orientation[3];
+    tf2::Quaternion q(act_orientation[1], act_orientation[2], act_orientation[3], act_orientation[0]);
+    tf2::Matrix3x3 m(q);
+    double roll, pitch, yaw;
+    m.getRPY(roll, pitch, yaw);
+    yaw *= (-M_PI / 3);
+    q.setRPY(roll, pitch, yaw);
+    
+    // geometry_msgs::msg::Quaternion q;
+    // q.w = act_orientation[0];
+    // q.x = act_orientation[1];
+    // q.y = act_orientation[2];
+    // q.z = act_orientation[3];
     this->updateTf(act_postion, q);
 }
 
@@ -274,7 +281,7 @@ void GpsImuFusion::gpsDataCallback(const sensor_msgs::msg::NavSatFix::SharedPtr 
 }
 
 /* ***** END CALLBACKS ***** */
-void GpsImuFusion::updateTf(Vector3d p, geometry_msgs::msg::Quaternion q)
+void GpsImuFusion::updateTf(Vector3d p, tf2::Quaternion q)
 {
     geometry_msgs::msg::TransformStamped t;
     nav_msgs::msg::Odometry odom;
@@ -289,11 +296,12 @@ void GpsImuFusion::updateTf(Vector3d p, geometry_msgs::msg::Quaternion q)
     t.transform.translation.y = p[1];
     t.transform.translation.z = 0.0f;
 
+
     /* Update TF Orientation */
-    t.transform.rotation.x = q.x;
-    t.transform.rotation.y = q.y;
-    t.transform.rotation.z = q.z;
-    t.transform.rotation.w = q.w;
+    t.transform.rotation.x = q.getX();
+    t.transform.rotation.y = q.getY();
+    t.transform.rotation.z = q.getZ();
+    t.transform.rotation.w = q.getW();
 
     /* Upated Odom header */
     odom.header.stamp = this->get_clock()->now();
@@ -306,10 +314,10 @@ void GpsImuFusion::updateTf(Vector3d p, geometry_msgs::msg::Quaternion q)
     odom.pose.pose.position.z = 0.0f;
 
     /* Update Odom orientation */
-    odom.pose.pose.orientation.x = q.x;
-    odom.pose.pose.orientation.y = q.y;
-    odom.pose.pose.orientation.z = q.z;
-    odom.pose.pose.orientation.w = q.w;
+    odom.pose.pose.orientation.x = q.getX();
+    odom.pose.pose.orientation.y = q.getY();
+    odom.pose.pose.orientation.z = q.getZ();
+    odom.pose.pose.orientation.w = q.getW();
 
     /* Publish new position */
     this->tf_broadcaster_->sendTransform(t);
