@@ -40,6 +40,7 @@ private:
     double gyroscope_bias_decay_factor = 1.0f;
     double accel_bias_decay_factor = 1.0f;
     double zero_velocity_constraint_noise = 1e-3;
+    double gps_acc_unc = 0.005;
 
     /**
      * TODO: Create log files

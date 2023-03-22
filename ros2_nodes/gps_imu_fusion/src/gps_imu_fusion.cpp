@@ -57,6 +57,7 @@ void GpsImuFusion::loadParameters()
     declare_parameter("noises.r_pos", 0.005);
     declare_parameter("noises.gyroscope_bias_decay_factor", 1.0);
     declare_parameter("noises.accel_bias_decay_factor", 1.0);
+    declare_parameter("noises.gps_acc_unc", 0.005);
 
     get_parameter("generic.imu_topic", this->imu_topic);
     get_parameter("generic.gps_topic", this->gps_topic);
@@ -75,6 +76,7 @@ void GpsImuFusion::loadParameters()
     get_parameter("noises.r_pos", this->r_pos);
     get_parameter("noises.gyroscope_bias_decay_factor", this->gyroscope_bias_decay_factor);
     get_parameter("noises.accel_bias_decay_factor", this->accel_bias_decay_factor);
+    get_parameter("noises.gps_acc_unc", this->gps_acc_unc);
 }
 
 /* ***** CALLBACKS ***** */
@@ -143,24 +145,6 @@ void GpsImuFusion::imuDataCallback(const sensor_msgs::msg::Imu::SharedPtr imu_da
     this->gndFusion->pose(act_postion, act_orientation, act_velocities);
 
     this->count_imu_topics++;
-
-    if (this->count_total_topic <= 6300)
-    {
-        ;
-        // // Write to the file
-        // this->predictFile << "ITER [" << (count_imu_topics) << "]: "
-        //                   << "\n"
-        //                   << "qw: " << act_orientation[0] << "\n"
-        //                   << "qx: " << act_orientation[1] << "\n"
-        //                   << "qy: " << act_orientation[2] << "\n"
-        //                   << "qz: " << act_orientation[3] << "\n"
-        //                   << "pn: " << act_postion[0] << "\n"
-        //                   << "pe: " << act_postion[1] << "\n"
-        //                   << "pd: " << act_postion[2] << "\n";
-    } else
-    {
-        this->predictFile.close();
-    }
     /* Update vehicle TF */
     tf2::Quaternion q(act_orientation[1], act_orientation[2], act_orientation[3], act_orientation[0]);
     tf2::Matrix3x3 m(q);
@@ -231,11 +215,18 @@ void GpsImuFusion::gpsDataCallback(const sensor_msgs::msg::NavSatFix::SharedPtr 
         double a = sin(dLat/2.0) * sin(dLat/2.0) + cos(prev_loc[0] * M_PI / 180) * cos(latitude * M_PI / 180.0) * sin(dLon/2.0) * sin(dLon/2.0);
         double c = 2.0 * atan2(sqrt(a), sqrt(1.0-a));
         double d = R * c;
-        d *= 1000.0; 
+        /* Update previous location */
+        prev_loc = Vector3d(latitude, longitude, altitude);
+        d *= 1000.0; /* Distance in meters */
+        if ((d*100) < (this->gps_acc_unc*100))
+        {
+            RCLCPP_INFO(this->get_logger(), "Vehicle is still. Skipping.");
+            return;
+        }
         double latVelocity = d * time;
         double lngVelocity = d * time;
         velocities << dLat, dLon, 0.0;
-        std::cerr << "Vx : " << velocities[0] << " Vy: " << velocities[1] << "\n";
+        // std::cerr << "Vx : " << velocities[0] << " Vy: " << velocities[1] << "\n";
         // velocities = measure_distance(prev_loc[0], prev_loc[1], prev_loc[2], latitude, longitude, altitude, 0.1);
     }
 
@@ -243,9 +234,6 @@ void GpsImuFusion::gpsDataCallback(const sensor_msgs::msg::NavSatFix::SharedPtr 
     if (!this->is_filter_orientation_initialized)
         return;
     RCLCPP_INFO(this->get_logger(), "FUSING GP DATA");
-
-    /* Update previous location */
-    prev_loc = Vector3d(latitude, longitude, altitude);
 
     this->gndFusion->fusegps(lla, velocities);
 
@@ -264,20 +252,6 @@ void GpsImuFusion::gpsDataCallback(const sensor_msgs::msg::NavSatFix::SharedPtr 
     this->gndFusion->pose(act_postion, act_orientation, act_velocities);
 
     count_gps_topics++;
-
-    // if (this->count_total_topic <= 6300)
-    // {
-    //     // Write to the file
-    //     this->predictFile << "ITER_GPS [" << (count_gps_topics) << "]: "
-    //                       << "\n"
-    //                       << "qw: " << act_orientation[0] << "\n"
-    //                       << "qx: " << act_orientation[1] << "\n"
-    //                       << "qy: " << act_orientation[2] << "\n"
-    //                       << "qz: " << act_orientation[3] << "\n"
-    //                       << "pn: " << act_postion[0] << "\n"
-    //                       << "pe: " << act_postion[1] << "\n"
-    //                       << "pd: " << act_postion[2] << "\n";
-    // }
 }
 
 /* ***** END CALLBACKS ***** */

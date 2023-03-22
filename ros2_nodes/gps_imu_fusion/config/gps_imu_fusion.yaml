@@ -18,3 +18,4 @@
       r_pos: 0.001
       gyroscope_bias_decay_factor: 1.0
       accel_bias_decay_factor: 1.0
+      gps_acc_unc: 0.005
