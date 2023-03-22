@@ -102,7 +102,7 @@ void GpsImuFusion::imuDataCallback(const sensor_msgs::msg::Imu::SharedPtr imu_da
             Vector3d(-7.88350054851016e-06, -1.93254742380793e-07, 3.23255528039867e-06));
         this->is_filter_orientation_initialized = true;
         this->gndFusion->printCurrentState();
-        RCLCPP_INFO(this->get_logger(), "Inital state covariance:");
+        // RCLCPP_INFO(this->get_logger(), "Inital state covariance:");
         // this->gndFusion->printCurrentStateCovariance();
     }
 
@@ -112,22 +112,10 @@ void GpsImuFusion::imuDataCallback(const sensor_msgs::msg::Imu::SharedPtr imu_da
     /* Convert IMU accel_data to eigen vector */
     Vector3d accel_data(imu_data->linear_acceleration.x, imu_data->linear_acceleration.y, imu_data->linear_acceleration.z);
 
-    /* Estimate vx and vy */
-    // vx += (imu_data->linear_acceleration.x < 0) ? ((-imu_data->linear_acceleration.x)*0.01) : (imu_data->linear_acceleration.x*0.01);
-    // vy += (imu_data->linear_acceleration.y < 0) ? ((-imu_data->linear_acceleration.y)*0.01) : (imu_data->linear_acceleration.y*0.01);
-
-    // if ((this->count_imu_topics % 10) == 0)
-    // {
-    //     RCLCPP_INFO(this->get_logger(), "Estimated Vx (ms): %f Estimated Vy (ms): %f", vx, vy);
-    //     vx = 0;
-    //     vy = 0;
-    // }
-
     Vector3d gyro_data(imu_data->angular_velocity.x, imu_data->angular_velocity.y, imu_data->angular_velocity.z);
 
     // RCLCPP_INFO(this->get_logger(), "PREDICTING NEW SYSTEM STATE");
-    // std::cerr << "accel_data: " << accel_data << "\n";
-    // std::cerr << "gyro_data: " << gyro_data << "\n";
+
     /* Predict */
     this->gndFusion->predict(accel_data, gyro_data);
     end = this->now();
@@ -233,16 +221,16 @@ void GpsImuFusion::gpsDataCallback(const sensor_msgs::msg::NavSatFix::SharedPtr 
 
     if (!this->is_filter_orientation_initialized)
         return;
-    RCLCPP_INFO(this->get_logger(), "FUSING GP DATA");
+    // RCLCPP_INFO(this->get_logger(), "FUSING GP DATA");
 
     this->gndFusion->fusegps(lla, velocities);
 
     end = this->now();
     rclcpp::Duration exe_time = end - start;
 
-    RCLCPP_INFO(this->get_logger(), "Fusion exe time (ms): %f", (float)exe_time.nanoseconds() / 1e6);
+    // RCLCPP_INFO(this->get_logger(), "Fusion exe time (ms): %f", (float)exe_time.nanoseconds() / 1e6);
 
-    RCLCPP_INFO(this->get_logger(), "Current filter state AFTER FUSION:");
+    // RCLCPP_INFO(this->get_logger(), "Current filter state AFTER FUSION:");
     // this->gndFusion->printCurrentState();
 
     Vector4d act_orientation;
