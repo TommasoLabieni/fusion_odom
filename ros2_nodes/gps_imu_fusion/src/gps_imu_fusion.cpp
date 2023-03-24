@@ -112,12 +112,16 @@ void GpsImuFusion::imuDataCallback(const sensor_msgs::msg::Imu::SharedPtr imu_da
     /* Convert IMU accel_data to eigen vector */
     Vector3d accel_data(imu_data->linear_acceleration.x, imu_data->linear_acceleration.y, imu_data->linear_acceleration.z);
 
-    Vector3d gyro_data(imu_data->angular_velocity.x, imu_data->angular_velocity.y, imu_data->angular_velocity.z);
+    Vector3d gyro_data(imu_data->angular_velocity.x, imu_data->angular_velocity.y, -imu_data->angular_velocity.z);
 
     // RCLCPP_INFO(this->get_logger(), "PREDICTING NEW SYSTEM STATE");
 
-    /* Predict */
-    this->gndFusion->predict(accel_data, gyro_data);
+    /* If vehicle is still don't updated filter state */
+    if(!this->is_vehicle_still)
+    {
+        /* Predict */
+        this->gndFusion->predict(accel_data, gyro_data);
+    }
     end = this->now();
     rclcpp::Duration exe_time = end - start;
 
@@ -141,30 +145,9 @@ void GpsImuFusion::imuDataCallback(const sensor_msgs::msg::Imu::SharedPtr imu_da
     yaw *= (-M_PI / 3);
     q.setRPY(roll, pitch, yaw);
     
-    // geometry_msgs::msg::Quaternion q;
-    // q.w = act_orientation[0];
-    // q.x = act_orientation[1];
-    // q.y = act_orientation[2];
-    // q.z = act_orientation[3];
+    // RCLCPP_INFO(this->get_logger(), "Publishing Tf and Odometry");
     this->updateTf(act_postion, q);
 }
-
-// Vector3d measure_distance(double lat1, double lon1, double alt1, double lat2, double lon2, double alt2, double time)
-// {
-//     Vector3d velocities;
-//     double dLat = lat2 * M_PI / 180.0 - lat1 * M_PI / 180.0;
-//     double dLon = lon2 * M_PI / 180.0 - lon1 * M_PI / 180.0;
-//     std::cerr << "dLat: " << dLat << "\n";
-//     std::cerr << "dLon: " << dLon << "\n";
-//     double latVelocity = dLat * time;
-//     double lngVelocity = dLon * time;
-//     std::cerr << "latVel: " << latVelocity << "\n";
-//     std::cerr << "lngVel: " << lngVelocity << "\n";
-//     double altVelocity = (alt2 - alt1) * time;
-//     velocities << latVelocity, lngVelocity, altVelocity;
-
-//     return velocities;
-// }
 
 void GpsImuFusion::gpsDataCallback(const sensor_msgs::msg::NavSatFix::SharedPtr gps_data)
 {
@@ -188,14 +171,6 @@ void GpsImuFusion::gpsDataCallback(const sensor_msgs::msg::NavSatFix::SharedPtr 
         this->is_filter_location_initialized = true;
         velocities << 3.29344e-08, 3.09796e-08, 0;
     } else {
-        /*
-
-        double dLat = latitude * M_PI / 180.0 - prev_loc[0] * M_PI / 180.0;
-        double dLon = longitude * M_PI / 180.0 - prev_loc[1] * M_PI / 180.0;
-        double latVelocity = dLat * 0.1 * 1000000;
-        double lngVelocity = dLon * 0.1 * 100000;
-        double altVelocity = (altitude - prev_loc[2]) * 0.1;
-        */
         double time = 1.0 / this->gps_fs;
         double R = 6378.137; 
         double dLat = latitude * M_PI / 180.0 - prev_loc[0] * M_PI / 180.0;
@@ -203,13 +178,25 @@ void GpsImuFusion::gpsDataCallback(const sensor_msgs::msg::NavSatFix::SharedPtr 
         double a = sin(dLat/2.0) * sin(dLat/2.0) + cos(prev_loc[0] * M_PI / 180) * cos(latitude * M_PI / 180.0) * sin(dLon/2.0) * sin(dLon/2.0);
         double c = 2.0 * atan2(sqrt(a), sqrt(1.0-a));
         double d = R * c;
+        this->total_dist += (d*1000);
+        this->act_dist += (d*1000);
+        if ((this->count_gps_topics % 10) == 0)
+        {
+            // RCLCPP_INFO(this->get_logger(), "You are traveling at %lf m/s == %lf km/h", this->act_dist, (this->act_dist * 3.6));
+            this->act_dist = 0;
+        }
         /* Update previous location */
         prev_loc = Vector3d(latitude, longitude, altitude);
         d *= 1000.0; /* Distance in meters */
         if ((d*100) < (this->gps_acc_unc*100))
         {
             RCLCPP_INFO(this->get_logger(), "Vehicle is still. Skipping.");
+            this->is_vehicle_still = true;
             return;
+        } else
+        {
+            this->is_vehicle_still = false;
+            // RCLCPP_INFO(this->get_logger(), "Vehicle is moving of %lf", d*100);
         }
         double latVelocity = d * time;
         double lngVelocity = d * time;
@@ -232,13 +219,6 @@ void GpsImuFusion::gpsDataCallback(const sensor_msgs::msg::NavSatFix::SharedPtr 
 
     // RCLCPP_INFO(this->get_logger(), "Current filter state AFTER FUSION:");
     // this->gndFusion->printCurrentState();
-
-    Vector4d act_orientation;
-    Vector3d act_postion;
-    Vector3d act_velocities;
-
-    this->gndFusion->pose(act_postion, act_orientation, act_velocities);
-
     count_gps_topics++;
 }
 

@@ -26,6 +26,13 @@ private:
     bool is_filter_orientation_initialized = false;
     bool is_filter_location_initialized = false;
     bool is_ref_location_set = false;
+    
+    /* Bool to understand if vehicle is still and so if filter doesn't need to be updated */
+    bool is_vehicle_still = false;
+
+    /* Velocity parameters */
+    double total_dist = 0.0;
+    double act_dist = 0.0;
 
     /* Sensors Frequency (Hz) */
     uint8_t imu_fs, gps_fs;
