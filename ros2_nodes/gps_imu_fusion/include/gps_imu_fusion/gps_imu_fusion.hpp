@@ -28,7 +28,7 @@ private:
     bool is_ref_location_set = false;
     
     /* Bool to understand if vehicle is still and so if filter doesn't need to be updated */
-    bool is_vehicle_still = false;
+    bool is_vehicle_still = true;
 
     /* Velocity parameters */
     double total_dist = 0.0;

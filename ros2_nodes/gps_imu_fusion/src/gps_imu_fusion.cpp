@@ -92,6 +92,9 @@ void GpsImuFusion::imuDataCallback(const sensor_msgs::msg::Imu::SharedPtr imu_da
     double qz = imu_data->orientation.z;
     double qw = imu_data->orientation.w;
 
+    if (!this->is_filter_location_initialized)
+        return;
+
     if (!this->is_filter_orientation_initialized)
     {
         this->gndFusion->setInitState(
@@ -105,9 +108,6 @@ void GpsImuFusion::imuDataCallback(const sensor_msgs::msg::Imu::SharedPtr imu_da
         // RCLCPP_INFO(this->get_logger(), "Inital state covariance:");
         // this->gndFusion->printCurrentStateCovariance();
     }
-
-    if (!this->is_filter_location_initialized)
-        return;
 
     /* Convert IMU accel_data to eigen vector */
     Vector3d accel_data(imu_data->linear_acceleration.x, imu_data->linear_acceleration.y, imu_data->linear_acceleration.z);
@@ -163,48 +163,48 @@ void GpsImuFusion::gpsDataCallback(const sensor_msgs::msg::NavSatFix::SharedPtr 
     Vector3d lla = Vector3d(latitude, longitude, altitude);
     Vector3d velocities;
 
+    double time = 1.0 / this->gps_fs;
+    double R = 6378.137; 
+    double dLat = latitude * M_PI / 180.0 - prev_loc[0] * M_PI / 180.0;
+    double dLon = longitude * M_PI / 180.0 - prev_loc[1] * M_PI / 180.0;
+    double a = sin(dLat/2.0) * sin(dLat/2.0) + cos(prev_loc[0] * M_PI / 180) * cos(latitude * M_PI / 180.0) * sin(dLon/2.0) * sin(dLon/2.0);
+    double c = 2.0 * atan2(sqrt(a), sqrt(1.0-a));
+    double d = R * c;
+    this->total_dist += (d*1000);
+    this->act_dist += (d*1000);
+    /* Update previous location */
+    prev_loc = Vector3d(latitude, longitude, altitude);
+    d *= 1000.0; /* Distance in meters */
+    if ((d*100) < (this->gps_acc_unc*100))
+    {
+        RCLCPP_INFO(this->get_logger(), "Vehicle is still. Skipping.");
+        this->is_vehicle_still = true;
+        return;
+    } else
+    {
+        this->is_vehicle_still = false;
+        if ((this->count_gps_topics % 10) == 0)
+        {
+            RCLCPP_INFO(this->get_logger(), "You are traveling at %lf m/s == %lf km/h", this->act_dist, (this->act_dist * 3.6));
+            this->act_dist = 0;
+        }
+        // RCLCPP_INFO(this->get_logger(), "Vehicle is moving of %lf", d*100);
+    }
+    double latVelocity = d * time;
+    double lngVelocity = d * time;
+    velocities << dLat, dLon, 0.0;
+    // std::cerr << "Vx : " << velocities[0] << " Vy: " << velocities[1] << "\n";
+    // velocities = measure_distance(prev_loc[0], prev_loc[1], prev_loc[2], latitude, longitude, altitude, 0.1);
+
+
     /* Check if this is the first Navsat msg */
-    if (!is_filter_location_initialized)
+    if (!is_filter_location_initialized && !this->is_vehicle_still)
     {
         /* In that case, set reference location */
         this->gndFusion->setRefLocation(latitude, longitude, altitude);
         this->is_filter_location_initialized = true;
         velocities << 3.29344e-08, 3.09796e-08, 0;
-    } else {
-        double time = 1.0 / this->gps_fs;
-        double R = 6378.137; 
-        double dLat = latitude * M_PI / 180.0 - prev_loc[0] * M_PI / 180.0;
-        double dLon = longitude * M_PI / 180.0 - prev_loc[1] * M_PI / 180.0;
-        double a = sin(dLat/2.0) * sin(dLat/2.0) + cos(prev_loc[0] * M_PI / 180) * cos(latitude * M_PI / 180.0) * sin(dLon/2.0) * sin(dLon/2.0);
-        double c = 2.0 * atan2(sqrt(a), sqrt(1.0-a));
-        double d = R * c;
-        this->total_dist += (d*1000);
-        this->act_dist += (d*1000);
-        if ((this->count_gps_topics % 10) == 0)
-        {
-            // RCLCPP_INFO(this->get_logger(), "You are traveling at %lf m/s == %lf km/h", this->act_dist, (this->act_dist * 3.6));
-            this->act_dist = 0;
-        }
-        /* Update previous location */
-        prev_loc = Vector3d(latitude, longitude, altitude);
-        d *= 1000.0; /* Distance in meters */
-        if ((d*100) < (this->gps_acc_unc*100))
-        {
-            RCLCPP_INFO(this->get_logger(), "Vehicle is still. Skipping.");
-            this->is_vehicle_still = true;
-            return;
-        } else
-        {
-            this->is_vehicle_still = false;
-            // RCLCPP_INFO(this->get_logger(), "Vehicle is moving of %lf", d*100);
-        }
-        double latVelocity = d * time;
-        double lngVelocity = d * time;
-        velocities << dLat, dLon, 0.0;
-        // std::cerr << "Vx : " << velocities[0] << " Vy: " << velocities[1] << "\n";
-        // velocities = measure_distance(prev_loc[0], prev_loc[1], prev_loc[2], latitude, longitude, altitude, 0.1);
-    }
-
+    } 
 
     if (!this->is_filter_orientation_initialized)
         return;
