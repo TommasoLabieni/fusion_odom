@@ -10,12 +10,12 @@
 
     noises:
       zero_velocity_constraint_noise: 0.01
-      gyro_noise: [7.5e-3, 7.5e-3, 7.5e-3]
+      gyro_noise: [3.0e-3, 3.0e-3, 3.0e-3]
       gyro_bias_noise: [0.00000000000004, 0.00000000000004, 0.00000000000004]
       accel_noise: [4.8e-2, 4.8e-2, 4.8e-2]
       accel_bias_noise: [0.0000000004, 0.0000000004, 0.0000000004]
-      r_vel: 0.0
-      r_pos: 0.001
+      r_vel: 0.00
+      r_pos: 0.00002
       gyroscope_bias_decay_factor: 1.0
       accel_bias_decay_factor: 1.0
       gps_acc_unc: 0.08
