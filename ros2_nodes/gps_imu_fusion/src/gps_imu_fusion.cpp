@@ -112,7 +112,8 @@ void GpsImuFusion::imuDataCallback(const sensor_msgs::msg::Imu::SharedPtr imu_da
     /* Convert IMU accel_data to eigen vector */
     Vector3d accel_data(imu_data->linear_acceleration.x, imu_data->linear_acceleration.y, imu_data->linear_acceleration.z);
 
-    Vector3d gyro_data(imu_data->angular_velocity.x, imu_data->angular_velocity.y, -imu_data->angular_velocity.z);
+    // Vector3d gyro_data(imu_data->angular_velocity.x, imu_data->angular_velocity.y, -imu_data->angular_velocity.z);
+    Vector3d gyro_data(0, 0, imu_data->angular_velocity.z);
 
     // RCLCPP_INFO(this->get_logger(), "PREDICTING NEW SYSTEM STATE");
 
@@ -143,7 +144,7 @@ void GpsImuFusion::imuDataCallback(const sensor_msgs::msg::Imu::SharedPtr imu_da
     double roll, pitch, yaw;
     m.getRPY(roll, pitch, yaw);
     yaw *= (-M_PI / 3);
-    q.setRPY(roll, pitch, yaw);
+    q.setRPY(0, 0, yaw);
     
     // RCLCPP_INFO(this->get_logger(), "Publishing Tf and Odometry");
     this->updateTf(act_postion, q);
@@ -182,6 +183,7 @@ void GpsImuFusion::gpsDataCallback(const sensor_msgs::msg::NavSatFix::SharedPtr 
         return;
     } else
     {
+        count_gps_topics++;
         this->is_vehicle_still = false;
         if ((this->count_gps_topics % 10) == 0)
         {
@@ -219,7 +221,6 @@ void GpsImuFusion::gpsDataCallback(const sensor_msgs::msg::NavSatFix::SharedPtr 
 
     // RCLCPP_INFO(this->get_logger(), "Current filter state AFTER FUSION:");
     // this->gndFusion->printCurrentState();
-    count_gps_topics++;
 }
 
 /* ***** END CALLBACKS ***** */
